@@ -1,0 +1,20 @@
+trigger: none 
+
+schedules:
+  - cron: "0 * * * *"  # Every hour
+    displayName: Hourly Schedule
+    branches:
+      include:
+        - main
+    always: true
+
+pool:
+  name: 'abc'
+
+steps:
+- task: PowerShell@2
+  displayName: 'Monitor Build script'
+  inputs:
+    filePath: 'MonitorBuildQueue.ps1' 
+    arguments: ''
+    pwsh: false 
