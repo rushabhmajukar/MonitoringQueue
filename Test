@@ -1,55 +1,48 @@
 # ========== USER CONFIGURATION ==========
 $collectionUrl = "http://your-server:8080/tfs/YourCollection"
 $project = "YourProject"
-$agentPoolName = "YourAgentPool"
+$agentPoolId = 123  # Your known pool ID
 
-# Azure VM Info (for agents running on Azure VMs)
+# Azure VM Info
 $resourceGroupName = "YourResourceGroup"
-$agentVMs = @("agent-vm-1", "agent-vm-2")  # VM names
+$agentVMs = @("agent-vm-1", "agent-vm-2")  # VM names for build agents
 
-# DevOps Server Personal Access Token
+# DevOps Server PAT
 $pat = "YOUR_PAT"
 
-# Azure SP Credentials (for managing Azure VMs)
+# Azure Service Principal Credentials
 $clientId = "YOUR_CLIENT_ID"
 $clientSecret = "YOUR_CLIENT_SECRET"
 $tenantId = "YOUR_TENANT_ID"
 $subscriptionId = "YOUR_SUBSCRIPTION_ID"
 
-# ========== AUTHENTICATION ==========
+# ========== AUTHENTICATE WITH AZURE ==========
+$securePassword = ConvertTo-SecureString $clientSecret -AsPlainText -Force
+$cred = New-Object System.Management.Automation.PSCredential ($clientId, $securePassword)
+Connect-AzAccount -ServicePrincipal -Credential $cred -TenantId $tenantId | Out-Null
+Set-AzContext -SubscriptionId $subscriptionId | Out-Null
+
+# ========== AUTHENTICATION FOR DEVOPS ==========
 $base64AuthInfo = [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes(":$pat"))
 $headers = @{ Authorization = "Basic $base64AuthInfo" }
 
-# Login to Azure (for VM start/stop)
-az login --service-principal -u $clientId -p $clientSecret --tenant $tenantId | Out-Null
-az account set --subscription $subscriptionId
-
-# ========== FUNCTION: GET BUILD QUEUE COUNT ==========
+# ========== FUNCTION: GET QUEUED BUILD COUNT ==========
 function Get-QueuedBuildCount {
     $url = "$collectionUrl/$project/_apis/build/builds?statusFilter=notStarted,inProgress&api-version=5.1"
     $response = Invoke-RestMethod -Uri $url -Headers $headers -Method Get
     return $response.count
 }
 
-# ========== FUNCTION: GET AGENT POOL ID ==========
-function Get-AgentPoolId {
-    $url = "$collectionUrl/_apis/distributedtask/pools?api-version=5.1"
-    $response = Invoke-RestMethod -Uri $url -Headers $headers -Method Get
-    return ($response.value | Where-Object { $_.name -eq $agentPoolName }).id
-}
-
 # ========== FUNCTION: GET OFFLINE AGENTS ==========
 function Get-OfflineAgents {
-    $poolId = Get-AgentPoolId
-    $url = "$collectionUrl/_apis/distributedtask/pools/$poolId/agents?api-version=5.1"
+    $url = "$collectionUrl/_apis/distributedtask/pools/$agentPoolId/agents?api-version=5.1"
     $response = Invoke-RestMethod -Uri $url -Headers $headers -Method Get
     return $response.value | Where-Object { $_.status -eq "offline" }
 }
 
 # ========== FUNCTION: GET ONLINE AGENTS ==========
 function Get-OnlineAgents {
-    $poolId = Get-AgentPoolId
-    $url = "$collectionUrl/_apis/distributedtask/pools/$poolId/agents?api-version=5.1"
+    $url = "$collectionUrl/_apis/distributedtask/pools/$agentPoolId/agents?api-version=5.1"
     $response = Invoke-RestMethod -Uri $url -Headers $headers -Method Get
     return $response.value | Where-Object { $_.status -eq "online" }
 }
@@ -65,17 +58,17 @@ if ($queuedBuilds -gt 0) {
         $vmName = $agentVMs | Where-Object { $agent.name -like "*$_*" }
         if ($vmName) {
             Write-Host "Starting VM: $vmName"
-            az vm start --resource-group $resourceGroupName --name $vmName | Out-Null
+            Start-AzVM -ResourceGroupName $resourceGroupName -Name $vmName | Out-Null
         }
     }
 } else {
-    # Stop online agents' VMs if no builds are queued
+    # Stop online agent VMs
     $onlineAgents = Get-OnlineAgents
     foreach ($agent in $onlineAgents) {
         $vmName = $agentVMs | Where-Object { $agent.name -like "*$_*" }
         if ($vmName) {
             Write-Host "Stopping VM: $vmName"
-            az vm deallocate --resource-group $resourceGroupName --name $vmName | Out-Null
+            Stop-AzVM -ResourceGroupName $resourceGroupName -Name $vmName -Force | Out-Null
         }
     }
 }
