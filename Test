@@ -1,16 +1,16 @@
 # ========== USER CONFIGURATION ==========
 $collectionUrl = "http://your-server:8080/tfs/YourCollection"
 $project = "YourProject"
-$agentPoolId = 123  # Directly use your known pool ID
+$agentPoolName = "YourAgentPool"
 
-# Azure VM Info
+# Azure VM Info (for agents running on Azure VMs)
 $resourceGroupName = "YourResourceGroup"
-$agentVMs = @("agent-vm-1", "agent-vm-2")  # List of VM names for agents
+$agentVMs = @("agent-vm-1", "agent-vm-2")  # VM names
 
 # DevOps Server Personal Access Token
 $pat = "YOUR_PAT"
 
-# Azure Service Principal Info
+# Azure SP Credentials (for managing Azure VMs)
 $clientId = "YOUR_CLIENT_ID"
 $clientSecret = "YOUR_CLIENT_SECRET"
 $tenantId = "YOUR_TENANT_ID"
@@ -20,27 +20,36 @@ $subscriptionId = "YOUR_SUBSCRIPTION_ID"
 $base64AuthInfo = [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes(":$pat"))
 $headers = @{ Authorization = "Basic $base64AuthInfo" }
 
-# Login to Azure (for VM control)
+# Login to Azure (for VM start/stop)
 az login --service-principal -u $clientId -p $clientSecret --tenant $tenantId | Out-Null
 az account set --subscription $subscriptionId
 
-# ========== FUNCTION: GET QUEUED BUILD COUNT ==========
+# ========== FUNCTION: GET BUILD QUEUE COUNT ==========
 function Get-QueuedBuildCount {
     $url = "$collectionUrl/$project/_apis/build/builds?statusFilter=notStarted,inProgress&api-version=5.1"
     $response = Invoke-RestMethod -Uri $url -Headers $headers -Method Get
     return $response.count
 }
 
+# ========== FUNCTION: GET AGENT POOL ID ==========
+function Get-AgentPoolId {
+    $url = "$collectionUrl/_apis/distributedtask/pools?api-version=5.1"
+    $response = Invoke-RestMethod -Uri $url -Headers $headers -Method Get
+    return ($response.value | Where-Object { $_.name -eq $agentPoolName }).id
+}
+
 # ========== FUNCTION: GET OFFLINE AGENTS ==========
 function Get-OfflineAgents {
-    $url = "$collectionUrl/_apis/distributedtask/pools/$agentPoolId/agents?api-version=5.1"
+    $poolId = Get-AgentPoolId
+    $url = "$collectionUrl/_apis/distributedtask/pools/$poolId/agents?api-version=5.1"
     $response = Invoke-RestMethod -Uri $url -Headers $headers -Method Get
     return $response.value | Where-Object { $_.status -eq "offline" }
 }
 
 # ========== FUNCTION: GET ONLINE AGENTS ==========
 function Get-OnlineAgents {
-    $url = "$collectionUrl/_apis/distributedtask/pools/$agentPoolId/agents?api-version=5.1"
+    $poolId = Get-AgentPoolId
+    $url = "$collectionUrl/_apis/distributedtask/pools/$poolId/agents?api-version=5.1"
     $response = Invoke-RestMethod -Uri $url -Headers $headers -Method Get
     return $response.value | Where-Object { $_.status -eq "online" }
 }
@@ -60,7 +69,7 @@ if ($queuedBuilds -gt 0) {
         }
     }
 } else {
-    # Stop online agent VMs if no builds are queued
+    # Stop online agents' VMs if no builds are queued
     $onlineAgents = Get-OnlineAgents
     foreach ($agent in $onlineAgents) {
         $vmName = $agentVMs | Where-Object { $agent.name -like "*$_*" }
@@ -70,3 +79,4 @@ if ($queuedBuilds -gt 0) {
         }
     }
 }
+
