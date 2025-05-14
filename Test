@@ -33,6 +33,7 @@ function Get-QueuedBuildCount {
     return $response.count
 }
 
+# ========== FUNCTION: GET AGENT POOL ID ==========
 function Get-AgentPoolId {
     $url = "$collectionUrl/_apis/distributedtask/pools?api-version=5.1"
     $response = Invoke-RestMethod -Uri $url -Headers $headers -Method Get
@@ -66,17 +67,17 @@ if ($queuedBuilds -gt 0) {
         $vmName = $agentVMs | Where-Object { $agent.name -like "*$_*" }
         if ($vmName) {
             Write-Host "Starting VM: $vmName"
-            Start-AzVM -ResourceGroupName $resourceGroupName -Name $vmName | Out-Null
+            az vm start --resource-group $resourceGroupName --name $vmName | Out-Null
         }
     }
 } else {
-    # Stop online agent VMs
+    # Stop online agents' VMs if no builds are queued
     $onlineAgents = Get-OnlineAgents
     foreach ($agent in $onlineAgents) {
         $vmName = $agentVMs | Where-Object { $agent.name -like "*$_*" }
         if ($vmName) {
             Write-Host "Stopping VM: $vmName"
-            Stop-AzVM -ResourceGroupName $resourceGroupName -Name $vmName -Force | Out-Null
+            az vm deallocate --resource-group $resourceGroupName --name $vmName | Out-Null
         }
     }
 }
