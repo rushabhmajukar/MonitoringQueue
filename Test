@@ -1,0 +1,52 @@
+trigger: none
+
+schedules:
+  - cron: "59 6 * * *"  # At 6:59 GMT
+    displayName: Start Always-On Agent
+    branches:
+      include:
+        - main
+    always: true
+
+pool:
+  name: 'abc'
+
+steps:
+- task: AzurePowerShell@5
+  displayName: 'Start Always-On Agent VM'
+  inputs:
+    azureSubscription: 'Your-Service-Connection-Name'
+    ScriptType: 'InlineScript'
+    Inline: |
+      $vmName = 'your-agent-vm-name'
+      $resourceGroup = 'your-resource-group'
+      Start-AzVM -Name $vmName -ResourceGroupName $resourceGroup
+    azurePowerShellVersion: 'LatestVersion'
+
+
+trigger: none
+
+schedules:
+  - cron: "1 17 * * *"  # At 17:01 GMT
+    displayName: Stop All Agents
+    branches:
+      include:
+        - main
+    always: true
+
+pool:
+  name: 'abc'
+
+steps:
+- task: AzurePowerShell@5
+  displayName: 'Stop Agent VMs'
+  inputs:
+    azureSubscription: 'Your-Service-Connection-Name'
+    ScriptType: 'InlineScript'
+    Inline: |
+      $vmsToStop = @('agent-vm-1', 'agent-vm-2', 'agent-vm-3') # Add your VMs
+      $resourceGroup = 'your-resource-group'
+      foreach ($vm in $vmsToStop) {
+        Stop-AzVM -Name $vm -ResourceGroupName $resourceGroup -Force
+      }
+    azurePowerShellVersion: 'LatestVersion'
