@@ -1,0 +1,11 @@
+========================== Starting Command Output ===========================
+"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe" -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Unrestricted -Command ". 'C:\azp\agent\_work\_temp\334f4212-865e-4d32-8fc3-9d8425d52ac2.ps1'"
+ConvertTo-SecureString : Cannot bind argument to parameter 'String' because it is null.
+At C:\azp\agent\_work\12\s\MonitoringProphetIDR.ps1:15 char:42
++ $securePassword = ConvertTo-SecureString $clientSecret -AsPlainText - ...
++                                          ~~~~~~~~~~~~~
+    + CategoryInfo          : InvalidData: (:) [ConvertTo-SecureString], ParentContainsErrorRecordException
+    + FullyQualifiedErrorId : ParameterArgumentValidationErrorNullNotAllowed,Microsoft.PowerShell.Commands.ConvertToSe 
+   cureStringCommand
+ 
+##[error]PowerShell exited with code '1'.
