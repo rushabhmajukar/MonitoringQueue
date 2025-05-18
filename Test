@@ -1,3 +1,5 @@
+$url = "$collectionUrl/$projectName/_apis/build/builds?statusFilter=notStarted&queueId=$queueId&api-version=6.0"
+
 trigger: none
 
 schedules:
