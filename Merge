@@ -1,0 +1,93 @@
+function Load-Environment {
+    param (
+        [string]$prefix
+    )
+
+    return @{
+        Name           = $prefix
+        CollectionUrl  = $env:"${prefix}_COLLECTION_URL"
+        ProjectName    = $env:"${prefix}_PROJECT_NAME"
+        AgentPoolName  = $env:"${prefix}_AGENT_POOL"
+        VMList         = ($env:"${prefix}_VM_LIST" -split ",")  # comma-separated VM names
+        ResourceGroup  = $env:"${prefix}_RESOURCE_GROUP"
+        PAT            = $env:"${prefix}_PAT"
+        TenantId       = $env:"${prefix}_TENANT_ID"
+        ClientId       = $env:"${prefix}_CLIENT_ID"
+        ClientSecret   = $env:"${prefix}_CLIENT_SECRET"
+        SubscriptionId = $env:"${prefix}_SUBSCRIPTION_ID"
+    }
+}
+
+function Monitor-And-Scale {
+    param (
+        [hashtable]$envContext
+    )
+
+    Write-Host "`n===== Checking: $($envContext.Name) ($($envContext.AgentPoolName)) ====="
+
+    # Login to Azure
+    $securePassword = ConvertTo-SecureString $envContext.ClientSecret -AsPlainText -Force
+    $cred = New-Object PSCredential ($envContext.ClientId, $securePassword)
+    Connect-AzAccount -ServicePrincipal -TenantId $envContext.TenantId -Credential $cred | Out-Null
+    Set-AzContext -SubscriptionId $envContext.SubscriptionId | Out-Null
+
+    # Azure DevOps API Auth
+    $base64AuthInfo = [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes(":$($envContext.PAT)"))
+    $headers = @{
+        Authorization = "Basic $base64AuthInfo"
+        "Content-Type" = "application/json"
+    }
+
+    # Get agent pool ID
+    $poolUrl = "$($envContext.CollectionUrl)/_apis/distributedtask/pools?api-version=6.0"
+    $poolResp = Invoke-RestMethod -Uri $poolUrl -Headers $headers -Method Get
+    $poolId = ($poolResp.value | Where-Object { $_.name -eq $envContext.AgentPoolName }).id
+
+    # Check queued builds
+    $buildUrl = "$($envContext.CollectionUrl)/$($envContext.ProjectName)/_apis/build/builds?statusFilter=notStarted&api-version=6.0"
+    $buildResp = Invoke-RestMethod -Uri $buildUrl -Headers $headers -Method Get
+    $queuedCount = $buildResp.count
+
+    if ($queuedCount -gt 0) {
+        Write-Host "Builds in queue: $queuedCount"
+        $agentsUrl = "$($envContext.CollectionUrl)/_apis/distributedtask/pools/$poolId/agents?api-version=6.0"
+        $agents = (Invoke-RestMethod -Uri $agentsUrl -Headers $headers).value
+        $offlineAgents = $agents | Where-Object { $_.status -eq "offline" }
+
+        foreach ($agent in $offlineAgents) {
+            $vmName = $envContext.VMList | Where-Object { $_ -like "*$($agent.name)*" }
+            if ($vmName) {
+                Write-Host "Starting VM: $vmName"
+                Start-AzVM -Name $vmName -ResourceGroupName $envContext.ResourceGroup
+            }
+        }
+    } else {
+        Write-Host "No builds in queue. Checking idle agents..."
+        $agentsUrl = "$($envContext.CollectionUrl)/_apis/distributedtask/pools/$poolId/agents?includeAssignedRequest=true&api-version=6.0"
+        $agents = (Invoke-RestMethod -Uri $agentsUrl -Headers $headers).value
+        $idleAgents = $agents | Where-Object { $_.status -eq "online" -and -not $_.assignedRequest }
+
+        if ($idleAgents.Count -gt 1) {
+            $agentsToStop = $idleAgents | Select-Object -Skip 1
+            foreach ($agent in $agentsToStop) {
+                $vmName = $envContext.VMList | Where-Object { $_ -like "*$($agent.name)*" }
+                if ($vmName) {
+                    Write-Host "Stopping VM: $vmName"
+                    Stop-AzVM -Name $vmName -ResourceGroupName $envContext.ResourceGroup -Force
+                }
+            }
+        } else {
+            Write-Host "Only one idle agent; skipping shutdown."
+        }
+    }
+}
+
+# ============================
+# Main Loop for All Envs
+# ============================
+$environmentPrefixes = @("ENV_A", "ENV_B", "ENV_C")  # Add more as needed
+
+foreach ($prefix in $environmentPrefixes) {
+    $envContext = Load-Environment -prefix $prefix
+    Monitor-And-Scale -envContext $envContext
+}
