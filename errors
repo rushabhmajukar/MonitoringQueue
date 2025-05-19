@@ -59,3 +59,7 @@ At C:\azp\agent\_work\15\s\QueueMonitor.ps1:4 char:12
     + FullyQualifiedErrorId : NullArray
  
 ##[error]PowerShell exited with code '1'.
+
++ function Load-Environment {
++                           ~
+Missing closing '}' in statement block or type definition.
