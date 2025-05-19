@@ -49,4 +49,13 @@
 2025-05-19T09:35:35.8814299Z     + CategoryInfo          : ParserError: (:) [], ParentContainsErrorRecordException
 2025-05-19T09:35:35.8816781Z     + FullyQualifiedErrorId : InvalidVariableReferenceWithDrive
 2025-05-19T09:35:35.8976294Z  
-2025-05-19T09:35:36.1240568Z ##[error]PowerShell exited with code '1'.               
+2025-05-19T09:35:36.1240568Z ##[error]PowerShell exited with code '1'.          
+
+Cannot index into a null array.
+At C:\azp\agent\_work\15\s\QueueMonitor.ps1:4 char:12
++     return @{
++            ~~
+    + CategoryInfo          : InvalidOperation: (:) [], ParentContainsErrorRecordException
+    + FullyQualifiedErrorId : NullArray
+ 
+##[error]PowerShell exited with code '1'.
