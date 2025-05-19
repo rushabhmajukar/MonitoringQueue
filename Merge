@@ -91,3 +91,55 @@ foreach ($prefix in $environmentPrefixes) {
     $envContext = Load-Environment -prefix $prefix
     Monitor-And-Scale -envContext $envContext
 }
+
+
+function Load-Environment {
+    param (
+        [string]$prefix
+    )
+
+    $requiredVars = @(
+        "${prefix}_COLLECTIONURL",
+        "${prefix}_PROJECT",
+        "${prefix}_AGENTPOOL",
+        "${prefix}_AZ_VMS",
+        "${prefix}_AZ_RG",
+        "${prefix}_ADO_PAT",
+        "${prefix}_AZ_TENANTID",
+        "${prefix}_AZ_CLIENTID",
+        "${prefix}_AZ_CLIENT_SECRET",
+        "${prefix}_AZ_SUBSCRIPTIONID"
+    )
+
+    Write-Host "`n== Dumping environment variables for: $prefix =="
+    foreach ($var in $requiredVars) {
+        $value = $env[$var]
+        if (-not $value) {
+            Write-Host "❌ $var is NULL or EMPTY"
+        } else {
+            Write-Host "✅ $var = $value"
+        }
+    }
+
+    # Proceed only if all variables exist
+    foreach ($var in $requiredVars) {
+        if (-not $env[$var]) {
+            throw "❌ Missing required environment variable: $var"
+        }
+    }
+
+    return @{
+        Name           = $prefix
+        CollectionUrl  = $env["${prefix}_COLLECTIONURL"]
+        ProjectName    = $env["${prefix}_PROJECT"]
+        AgentPoolName  = $env["${prefix}_AGENTPOOL"]
+        VMList         = ($env["${prefix}_AZ_VMS"] -split ",")
+        ResourceGroup  = $env["${prefix}_AZ_RG"]
+        PAT            = $env["${prefix}_ADO_PAT"]
+        TenantId       = $env["${prefix}_AZ_TENANTID"]
+        ClientId       = $env["${prefix}_AZ_CLIENTID"]
+        ClientSecret   = $env["${prefix}_AZ_CLIENT_SECRET"]
+        SubscriptionId = $env["${prefix}_AZ_SUBSCRIPTIONID"]
+    }
+}
+
