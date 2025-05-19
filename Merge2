@@ -1,0 +1,107 @@
+function Load-Environment {
+    param ([string]$prefix)
+
+    $envBlock = @{
+        Name           = $prefix
+        CollectionUrl  = $env:"${prefix}_CollectionURL"
+        ProjectName    = $env:"${prefix}_Project"
+        AgentPoolName  = $env:"${prefix}_AgentPool"
+        VMList         = ($env:"${prefix}_Az_VMs" -split ",")  # e.g., agent-vm-1,agent-vm-2
+        ResourceGroup  = $env:"${prefix}_Az_RG"
+        PAT            = $env:"${prefix}_ADO_PAT"
+        TenantId       = $env:"${prefix}_Az_TenantID"
+        ClientId       = $env:"${prefix}_Az_ClientID"
+        ClientSecret   = $env:"${prefix}_Az_Client_Secret"
+        SubscriptionId = $env:"${prefix}_Az_SubscriptionID"
+    }
+
+    if ($envBlock.Values | Where-Object { $_ -eq $null }) {
+        Write-Warning "Missing environment variables for prefix: $prefix"
+    }
+
+    return $envBlock
+}
+
+function Monitor-And-Scale {
+    param ([hashtable]$envContext)
+
+    Write-Host "`n===== Checking: $($envContext.Name) ($($envContext.AgentPoolName)) ====="
+
+    try {
+        $securePassword = ConvertTo-SecureString $envContext.ClientSecret -AsPlainText -Force
+        $cred = New-Object PSCredential ($envContext.ClientId, $securePassword)
+        Connect-AzAccount -ServicePrincipal -TenantId $envContext.TenantId -Credential $cred | Out-Null
+        Set-AzContext -SubscriptionId $envContext.SubscriptionId | Out-Null
+    } catch {
+        Write-Error "Azure login failed for $($envContext.Name): $_"
+        return
+    }
+
+    $base64AuthInfo = [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes(":$($envContext.PAT)"))
+    $headers = @{
+        Authorization = "Basic $base64AuthInfo"
+        "Content-Type" = "application/json"
+    }
+
+    $poolUrl = "$($envContext.CollectionUrl)/_apis/distributedtask/pools?api-version=6.0"
+    try {
+        $poolResp = Invoke-RestMethod -Uri $poolUrl -Headers $headers
+        $poolId = ($poolResp.value | Where-Object { $_.name -eq $envContext.AgentPoolName }).id
+    } catch {
+        Write-Error "Failed to get agent pool ID: $_"
+        return
+    }
+
+    if (-not $poolId) {
+        Write-Error "Agent pool ID not found for: $($envContext.AgentPoolName)"
+        return
+    }
+
+    $buildUrl = "$($envContext.CollectionUrl)/$($envContext.ProjectName)/_apis/build/builds?statusFilter=notStarted&api-version=6.0"
+    $buildResp = Invoke-RestMethod -Uri $buildUrl -Headers $headers -Method Get
+    $queuedCount = $buildResp.count
+
+    $agentsUrl = "$($envContext.CollectionUrl)/_apis/distributedtask/pools/$poolId/agents?includeAssignedRequest=true&api-version=6.0"
+    $agents = (Invoke-RestMethod -Uri $agentsUrl -Headers $headers).value
+
+    if ($queuedCount -gt 0) {
+        Write-Host "Builds in queue: $queuedCount"
+        $offlineAgents = $agents | Where-Object { $_.status -eq "offline" }
+
+        foreach ($agent in $offlineAgents) {
+            $vmName = $envContext.VMList | Where-Object { $agent.name -like "*$_*" }
+            if ($vmName) {
+                Write-Host "Starting VM: $vmName"
+                Start-AzVM -Name $vmName -ResourceGroupName $envContext.ResourceGroup | Out-Null
+            } else {
+                Write-Warning "No matching VM found for agent $($agent.name)"
+            }
+        }
+    } else {
+        Write-Host "No builds in queue. Checking idle agents..."
+        $idleAgents = $agents | Where-Object { $_.status -eq "online" -and -not $_.assignedRequest }
+
+        if ($idleAgents.Count -gt 1) {
+            $agentsToStop = $idleAgents | Select-Object -Skip 1
+            foreach ($agent in $agentsToStop) {
+                $vmName = $envContext.VMList | Where-Object { $agent.name -like "*$_*" }
+                if ($vmName) {
+                    Write-Host "Stopping VM: $vmName"
+                    Stop-AzVM -Name $vmName -ResourceGroupName $envContext.ResourceGroup -Force | Out-Null
+                } else {
+                    Write-Warning "No matching VM found for agent $($agent.name)"
+                }
+            }
+        } else {
+            Write-Host "Only one idle agent remains. Skipping shutdown."
+        }
+    }
+}
+
+# MAIN - Execute for ProLS and ProDR
+$environmentPrefixes = @("ProLS", "ProDR")
+
+foreach ($prefix in $environmentPrefixes) {
+    $envContext = Load-Environment -prefix $prefix
+    Monitor-And-Scale -envContext $envContext
+}
