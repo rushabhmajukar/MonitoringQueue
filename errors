@@ -1,65 +1,30 @@
-2025-05-19T09:35:32.5077470Z Formatted command: . 'C:\azp\agent\_work\15\s\QueueTracker.ps1'
-2025-05-19T09:35:32.6176883Z ========================== Starting Command Output ===========================
-2025-05-19T09:35:32.6537972Z ##[command]"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe" -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Unrestricted -Command ". 'C:\azp\agent\_work\_temp\84ec38a2-37cd-4db1-82ca-6ab2e3d2a641.ps1'"
-2025-05-19T09:35:35.8623242Z At C:\azp\agent\_work\15\s\QueueTracker.ps1:8 char:26
-2025-05-19T09:35:35.8627670Z +         CollectionUrl  = $env:"${prefix}_COLLECTION_URL"
-2025-05-19T09:35:35.8630940Z +                          ~~~~~
-2025-05-19T09:35:35.8635066Z Variable reference is not valid. ':' was not followed by a valid variable name character. Consider using ${} to 
-2025-05-19T09:35:35.8637896Z delimit the name.
-2025-05-19T09:35:35.8640843Z At C:\azp\agent\_work\15\s\QueueTracker.ps1:8 char:31
-2025-05-19T09:35:35.8643845Z +         CollectionUrl  = $env:"${prefix}_COLLECTION_URL"
-2025-05-19T09:35:35.8646495Z +                               ~~~~~~~~~~~~~~~~~~~~~~~~~~
-2025-05-19T09:35:35.8649414Z Unexpected token '"${prefix}_COLLECTION_URL"' in expression or statement.
-2025-05-19T09:35:35.8652975Z At C:\azp\agent\_work\15\s\QueueTracker.ps1:8 char:31
-2025-05-19T09:35:35.8656148Z +         CollectionUrl  = $env:"${prefix}_COLLECTION_URL"
-2025-05-19T09:35:35.8658503Z +                               ~
-2025-05-19T09:35:35.8660964Z The hash literal was incomplete.
-2025-05-19T09:35:35.8670928Z At C:\azp\agent\_work\15\s\QueueTracker.ps1:9 char:26
-2025-05-19T09:35:35.8672166Z +         ProjectName    = $env:"${prefix}_PROJECT_NAME"
-2025-05-19T09:35:35.8674861Z +                          ~~~~~
-2025-05-19T09:35:35.8676632Z Variable reference is not valid. ':' was not followed by a valid variable name character. Consider using ${} to 
-2025-05-19T09:35:35.8679167Z delimit the name.
-2025-05-19T09:35:35.8681580Z At C:\azp\agent\_work\15\s\QueueTracker.ps1:10 char:26
-2025-05-19T09:35:35.8683456Z +         AgentPoolName  = $env:"${prefix}_AGENT_POOL"
-2025-05-19T09:35:35.8688688Z +                          ~~~~~
-2025-05-19T09:35:35.8690717Z Variable reference is not valid. ':' was not followed by a valid variable name character. Consider using ${} to 
-2025-05-19T09:35:35.8692985Z delimit the name.
-2025-05-19T09:35:35.8694722Z At C:\azp\agent\_work\15\s\QueueTracker.ps1:11 char:27
-2025-05-19T09:35:35.8696488Z +         VMList         = ($env:"${prefix}_VM_LIST" -split ",")
-2025-05-19T09:35:35.8697986Z +                           ~~~~~
-2025-05-19T09:35:35.8699454Z Variable reference is not valid. ':' was not followed by a valid variable name character. Consider using ${} to 
-2025-05-19T09:35:35.8700430Z delimit the name.
-2025-05-19T09:35:35.8702076Z At C:\azp\agent\_work\15\s\QueueTracker.ps1:11 char:32
-2025-05-19T09:35:35.8703399Z +         VMList         = ($env:"${prefix}_VM_LIST" -split ",")
-2025-05-19T09:35:35.8708220Z +                                ~~~~~~~~~~~~~~~~~~~
-2025-05-19T09:35:35.8709778Z Unexpected token '"${prefix}_VM_LIST"' in expression or statement.
-2025-05-19T09:35:35.8712253Z At C:\azp\agent\_work\15\s\QueueTracker.ps1:11 char:32
-2025-05-19T09:35:35.8782644Z +         VMList         = ($env:"${prefix}_VM_LIST" -split ",")
-2025-05-19T09:35:35.8798583Z +                                ~
-2025-05-19T09:35:35.8800475Z Missing closing ')' in expression.
-2025-05-19T09:35:35.8802057Z At C:\azp\agent\_work\15\s\QueueTracker.ps1:1 char:27
-2025-05-19T09:35:35.8803307Z + function Load-Environment {
-2025-05-19T09:35:35.8804387Z +                           ~
-2025-05-19T09:35:35.8805669Z Missing closing '}' in statement block or type definition.
-2025-05-19T09:35:35.8807049Z At C:\azp\agent\_work\15\s\QueueTracker.ps1:11 char:62
-2025-05-19T09:35:35.8808316Z +         VMList         = ($env:"${prefix}_VM_LIST" -split ",")
-2025-05-19T09:35:35.8809732Z +                                                              ~
-2025-05-19T09:35:35.8810952Z Unexpected token ')' in expression or statement.
-2025-05-19T09:35:35.8812446Z Not all parse errors were reported.  Correct the reported errors and try again.
-2025-05-19T09:35:35.8814299Z     + CategoryInfo          : ParserError: (:) [], ParentContainsErrorRecordException
-2025-05-19T09:35:35.8816781Z     + FullyQualifiedErrorId : InvalidVariableReferenceWithDrive
-2025-05-19T09:35:35.8976294Z  
-2025-05-19T09:35:36.1240568Z ##[error]PowerShell exited with code '1'.          
 
-Cannot index into a null array.
-At C:\azp\agent\_work\15\s\QueueMonitor.ps1:4 char:12
-+     return @{
-+            ~~
-    + CategoryInfo          : InvalidOperation: (:) [], ParentContainsErrorRecordException
-    + FullyQualifiedErrorId : NullArray
- 
-##[error]PowerShell exited with code '1'.
-
+At C:\azp\agent\_work\15\s\QueueTracker.ps1:4 char:65
++ ... $VMsString = [Environment]::GetEnvironmentVariable(${prefix}_Az_VMs")
++                                                                 ~~~~~~~~~
+Unexpected token '_Az_VMs")
+    if (-not $VMsString) {
+        throw "Environment' in expression or statement.
+At C:\azp\agent\_work\15\s\QueueTracker.ps1:44 char:116
++ ... text.ProjectName)/_apis/build/builds?statusFilter=notStarted&api-vers ...
++                                                                 ~
+The ampersand (&) character is not allowed. The & operator is reserved for future use; wrap an ampersand in double 
+quotation marks ("&") to pass it as part of a string.
+At C:\azp\agent\_work\15\s\QueueTracker.ps1:63 char:122
++ ... ributedtask/pools/$poolId/agents?includeAssignedRequest=true&api-vers ...
++                                                                 ~
+The ampersand (&) character is not allowed. The & operator is reserved for future use; wrap an ampersand in double 
+quotation marks ("&") to pass it as part of a string.
+At C:\azp\agent\_work\15\s\QueueTracker.ps1:82 char:51
++ $environmentPrefixes = @("ProLS", "ProDR", "")
++                                                   ~~~~~~
+The string is missing the terminator: ".
+At C:\azp\agent\_work\15\s\QueueTracker.ps1:1 char:27
 + function Load-Environment {
 +                           ~
 Missing closing '}' in statement block or type definition.
+    + CategoryInfo          : ParserError: (:) [], ParentContainsErrorRecordException
+    + FullyQualifiedErrorId : MissingEndParenthesisInMethodCall
+ 
+##[error]PowerShell exited with code '1'.
+
