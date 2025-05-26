@@ -1,8 +1,2 @@
-Invoke-RestMethod : {"$id":"1","innerException":null,"message":"A potentially dangerous Request.Path value was detected 
-from the client (:).","typeName":"System.Web.HttpException, System.Web","typeKey":"HttpException","errorCode":0,"eventId":0}
-At line:39 char:18
-+ ... revisions = Invoke-RestMethod -Uri $revisionsUri -Headers @{Authoriza ...
-+                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    + CategoryInfo          : InvalidOperation: (System.Net.HttpWebRequest:HttpWebRequest) [Invoke-RestMethod], WebExceptio 
-   n
-    + FullyQualifiedErrorId : WebCmdletWebResponseException,Microsoft.PowerShell.Commands.InvokeRestMethodCommand
+I would recommend using parameters to the PowerShell script instead of having to deal with environment variables.
+Also it is a good practice to close the Azure connection at the end of the scripts. Again, PS params may be better than environment variables there too.
