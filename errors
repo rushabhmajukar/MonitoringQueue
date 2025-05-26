@@ -1,30 +1,8 @@
-
-At C:\azp\agent\_work\15\s\QueueTracker.ps1:4 char:65
-+ ... $VMsString = [Environment]::GetEnvironmentVariable(${prefix}_Az_VMs")
-+                                                                 ~~~~~~~~~
-Unexpected token '_Az_VMs")
-    if (-not $VMsString) {
-        throw "Environment' in expression or statement.
-At C:\azp\agent\_work\15\s\QueueTracker.ps1:44 char:116
-+ ... text.ProjectName)/_apis/build/builds?statusFilter=notStarted&api-vers ...
-+                                                                 ~
-The ampersand (&) character is not allowed. The & operator is reserved for future use; wrap an ampersand in double 
-quotation marks ("&") to pass it as part of a string.
-At C:\azp\agent\_work\15\s\QueueTracker.ps1:63 char:122
-+ ... ributedtask/pools/$poolId/agents?includeAssignedRequest=true&api-vers ...
-+                                                                 ~
-The ampersand (&) character is not allowed. The & operator is reserved for future use; wrap an ampersand in double 
-quotation marks ("&") to pass it as part of a string.
-At C:\azp\agent\_work\15\s\QueueTracker.ps1:82 char:51
-+ $environmentPrefixes = @("ProLS", "ProDR", "")
-+                                                   ~~~~~~
-The string is missing the terminator: ".
-At C:\azp\agent\_work\15\s\QueueTracker.ps1:1 char:27
-+ function Load-Environment {
-+                           ~
-Missing closing '}' in statement block or type definition.
-    + CategoryInfo          : ParserError: (:) [], ParentContainsErrorRecordException
-    + FullyQualifiedErrorId : MissingEndParenthesisInMethodCall
- 
-##[error]PowerShell exited with code '1'.
-
+Invoke-RestMethod : {"$id":"1","innerException":null,"message":"A potentially dangerous Request.Path value was detected 
+from the client (:).","typeName":"System.Web.HttpException, System.Web","typeKey":"HttpException","errorCode":0,"eventId":0}
+At line:39 char:18
++ ... revisions = Invoke-RestMethod -Uri $revisionsUri -Headers @{Authoriza ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : InvalidOperation: (System.Net.HttpWebRequest:HttpWebRequest) [Invoke-RestMethod], WebExceptio 
+   n
+    + FullyQualifiedErrorId : WebCmdletWebResponseException,Microsoft.PowerShell.Commands.InvokeRestMethodCommand
