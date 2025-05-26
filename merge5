@@ -1,0 +1,127 @@
+param (
+    [Parameter(Mandatory)]
+    [string[]]$EnvironmentPrefixes,
+
+    [Parameter(Mandatory)]
+    [string]$CollectionUrl,
+
+    [Parameter(Mandatory)]
+    [string]$Project,
+
+    [Parameter(Mandatory)]
+    [string]$AgentPool,
+
+    [Parameter(Mandatory)]
+    [string[]]$AzVms,
+
+    [Parameter(Mandatory)]
+    [string]$AzResourceGroup,
+
+    [Parameter(Mandatory)]
+    [string]$AdoPat,
+
+    [Parameter(Mandatory)]
+    [string]$AzTenantId,
+
+    [Parameter(Mandatory)]
+    [string]$AzClientId,
+
+    [Parameter(Mandatory)]
+    [string]$AzClientSecret,
+
+    [Parameter(Mandatory)]
+    [string]$AzSubscriptionId
+)
+
+function Monitor-And-Scale {
+    param (
+        [hashtable]$EnvContext
+    )
+
+    Write-Host "`n===== Checking: $($EnvContext.Name) ($($EnvContext.AGENTPOOL)) ====="
+
+    # Azure Login
+    $securePassword = ConvertTo-SecureString $EnvContext["AZ_CLIENT_SECRET"] -AsPlainText -Force
+    $cred = New-Object PSCredential ($EnvContext["AZ_CLIENTID"], $securePassword)
+    Connect-AzAccount -ServicePrincipal -TenantId $EnvContext["AZ_TENANTID"] -Credential $cred | Out-Null
+    Set-AzContext -SubscriptionId $EnvContext["AZ_SUBSCRIPTIONID"] | Out-Null
+
+    # Azure DevOps API Auth
+    $base64AuthInfo = [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes(":$($EnvContext["ADO_PAT"])"))
+    $headers = @{
+        Authorization = "Basic $base64AuthInfo"
+        "Content-Type" = "application/json"
+    }
+
+    # Get Agent Pool ID
+    $poolUrl = "$($EnvContext["COLLECTIONURL"])/_apis/distributedtask/pools?api-version=6.0"
+    $poolResp = Invoke-RestMethod -Uri $poolUrl -Headers $headers -Method Get
+    $poolId = ($poolResp.value | Where-Object { $_.name -eq $EnvContext["AGENTPOOL"] }).id
+
+    # Check queued builds
+    $buildUrl = "$($EnvContext["COLLECTIONURL"])/$($EnvContext["PROJECT"])/_apis/build/builds?statusFilter=notStarted`&api-version=6.0"
+    $buildResp = Invoke-RestMethod -Uri $buildUrl -Headers $headers -Method Get
+    $queuedCount = $buildResp.count
+
+    if ($queuedCount -gt 0) {
+        Write-Host "Builds in queue: $queuedCount"
+
+        $agentsUrl = "$($EnvContext["COLLECTIONURL"])/_apis/distributedtask/pools/$poolId/agents?api-version=6.0"
+        $agents = (Invoke-RestMethod -Uri $agentsUrl -Headers $headers).value
+        $offlineAgents = $agents | Where-Object { $_.status -eq "offline" }
+
+        foreach ($agent in $offlineAgents) {
+            $vmName = $EnvContext["VMList"] | Where-Object { $_ -like "*$($agent.name)*" }
+            if ($vmName) {
+                Write-Host "Starting VM: $vmName"
+                Start-AzVM -Name $vmName -ResourceGroupName $EnvContext["AZ_RG"]
+            }
+        }
+    } else {
+        Write-Host "No builds in queue. Checking idle agents..."
+
+        $agentsUrl = "$($EnvContext["COLLECTIONURL"])/_apis/distributedtask/pools/$poolId/agents?includeAssignedRequest=true`&api-version=6.0"
+        $agents = (Invoke-RestMethod -Uri $agentsUrl -Headers $headers).value
+        $idleAgents = $agents | Where-Object { $_.status -eq "online" -and -not $_.assignedRequest }
+
+        if ($idleAgents.Count -gt 1) {
+            $agentsToStop = $idleAgents | Select-Object -Skip 1
+            foreach ($agent in $agentsToStop) {
+                $vmName = $EnvContext["VMList"] | Where-Object { $_ -like "*$($agent.name)*" }
+                if ($vmName) {
+                    Write-Host "Stopping VM: $vmName"
+                    Stop-AzVM -Name $vmName -ResourceGroupName $EnvContext["AZ_RG"] -Force
+                }
+            }
+        } else {
+            Write-Host "Only one idle agent; skipping shutdown."
+        }
+    }
+
+    # Disconnect Azure session
+    Disconnect-AzAccount -Scope Process -ErrorAction SilentlyContinue
+    Write-Host "Disconnected Azure session for: $($EnvContext.Name)"
+}
+
+foreach ($prefix in $EnvironmentPrefixes) {
+    try {
+        $envContext = @{
+            "Name"              = $prefix
+            "COLLECTIONURL"     = $CollectionUrl
+            "PROJECT"           = $Project
+            "AGENTPOOL"         = $AgentPool
+            "AZ_VMS"            = $AzVms -join ","
+            "AZ_RG"             = $AzResourceGroup
+            "ADO_PAT"           = $AdoPat
+            "AZ_TENANTID"       = $AzTenantId
+            "AZ_CLIENTID"       = $AzClientId
+            "AZ_CLIENT_SECRET"  = $AzClientSecret
+            "AZ_SUBSCRIPTIONID" = $AzSubscriptionId
+            "VMList"            = $AzVms
+        }
+
+        Monitor-And-Scale -EnvContext $envContext
+    } catch {
+        Write-Error "Failed for environment prefix '$prefix': $_"
+    }
+}
