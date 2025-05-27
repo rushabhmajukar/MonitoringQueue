@@ -1,15 +1,15 @@
 param (
     [string]$prefix,
-    [string]$COLLECTIONURL,
-    [string]$PROJECT,
-    [string]$AGENTPOOL,
-    [string]$AZ_VMS,
-    [string]$AZ_RG,
+    [string]$CollectionURL,
+    [string]$Project,
+    [string]$AgentPool,
+    [string]$Az_VMs,
+    [string]$Az_RG,
     [string]$ADO_PAT,
-    [string]$AZ_TENANTID,
-    [string]$AZ_CLIENTID,
-    [string]$AZ_CLIENT_SECRET,
-    [string]$AZ_SUBSCRIPTIONID
+    [string]$Az_TenantID,
+    [string]$Az_ClientID,
+    [string]$Az_Client_Secret,
+    [string]$Az_SubscriptionID
 )
 
 function Monitor-And-Scale {
@@ -17,13 +17,13 @@ function Monitor-And-Scale {
         [hashtable]$envContext
     )
 
-    Write-Host "`n===== Checking: $($envContext.Name) ($($envContext.AGENTPOOL)) ====="
+    Write-Host "`n===== Checking: ($($envContext.Agentpool)) ====="
 
     # Azure Login
-    $securePassword = ConvertTo-SecureString $envContext["AZ_CLIENT_SECRET"] -AsPlainText -Force
-    $cred = New-Object PSCredential ($envContext["AZ_CLIENTID"], $securePassword)
-    Connect-AzAccount -ServicePrincipal -TenantId $envContext["AZ_TENANTID"] -Credential $cred | Out-Null
-    Set-AzContext -SubscriptionId $envContext["AZ_SUBSCRIPTIONID"] | Out-Null
+    $securePassword = ConvertTo-SecureString $envContext["Az_Client_Secret"] -AsPlainText -Force
+    $cred = New-Object PSCredential ($envContext["Az_ClientID"], $securePassword)
+    Connect-AzAccount -ServicePrincipal -TenantId $envContext["Az_TenantID"] -Credential $cred | Out-Null
+    Set-AzContext -SubscriptionId $envContext["Az_SubscriptionID"] | Out-Null
 
     # Azure DevOps API Auth
     $base64AuthInfo = [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes(":$($envContext["ADO_PAT"])"))
@@ -33,19 +33,19 @@ function Monitor-And-Scale {
     }
 
     # Get Agent Pool ID
-    $poolUrl = "$($envContext["COLLECTIONURL"])/_apis/distributedtask/pools?api-version=6.0"
+    $poolUrl = "$($envContext["CollectionURL"])/_apis/distributedtask/pools?api-version=6.0"
     $poolResp = Invoke-RestMethod -Uri $poolUrl -Headers $headers -Method Get
     $poolId = ($poolResp.value | Where-Object { $_.name -eq $envContext["AGENTPOOL"] }).id
 
     # Check queued builds
-    $buildUrl = "$($envContext["COLLECTIONURL"])/$($envContext["PROJECT"])/_apis/build/builds?statusFilter=notStarted`&api-version=6.0"
+    $buildUrl = "$($envContext["CollectionURL"])/$($envContext["Project"])/_apis/build/builds?statusFilter=notStarted`&api-version=6.0"
     $buildResp = Invoke-RestMethod -Uri $buildUrl -Headers $headers -Method Get
     $queuedCount = $buildResp.count
 
     if ($queuedCount -gt 0) {
         Write-Host "Builds in queue: $queuedCount"
 
-        $agentsUrl = "$($envContext["COLLECTIONURL"])/_apis/distributedtask/pools/$poolId/agents?api-version=6.0"
+        $agentsUrl = "$($envContext["CollectionURL"])/_apis/distributedtask/pools/$poolId/agents?api-version=6.0"
         $agents = (Invoke-RestMethod -Uri $agentsUrl -Headers $headers).value
         $offlineAgents = $agents | Where-Object { $_.status -eq "offline" }
 
@@ -59,7 +59,7 @@ function Monitor-And-Scale {
     } else {
         Write-Host "No builds in queue. Checking idle agents..."
 
-        $agentsUrl = "$($envContext["COLLECTIONURL"])/_apis/distributedtask/pools/$poolId/agents?includeAssignedRequest=true`&api-version=6.0"
+        $agentsUrl = "$($envContext["CollectionURL"])/_apis/distributedtask/pools/$poolId/agents?includeAssignedRequest=true`&api-version=6.0"
         $agents = (Invoke-RestMethod -Uri $agentsUrl -Headers $headers).value
         $idleAgents = $agents | Where-Object { $_.status -eq "online" -and -not $_.assignedRequest }
 
@@ -68,7 +68,7 @@ function Monitor-And-Scale {
                 $vmName = $envContext["VMList"] | Where-Object { $_ -like "*$($agent.name)*" }
                 if ($vmName) {
                     Write-Host "Stopping VM: $vmName"
-                    Stop-AzVM -Name $vmName -ResourceGroupName $envContext["AZ_RG"] -Force
+                    Stop-AzVM -Name $vmName -ResourceGroupName $envContext["Az_RG"] -Force
                 }
             }
         }
@@ -78,7 +78,7 @@ function Monitor-And-Scale {
                 $vmName = $envContext["VMList"] | Where-Object { $_ -like "*$($agent.name)*" }
                 if ($vmName) {
                     Write-Host "Stopping VM: $vmName"
-                    Stop-AzVM -Name $vmName -ResourceGroupName $envContext["AZ_RG"] -Force
+                    Stop-AzVM -Name $vmName -ResourceGroupName $envContext["Az_RG"] -Force
                 }
             }
         } else {
@@ -86,23 +86,22 @@ function Monitor-And-Scale {
         }
     }
 
-    # 💡 Good practice: Close the Azure session
     Disconnect-AzAccount | Out-Null
 }
 
 # Prepare environment context
 $envContext = @{
-    "COLLECTIONURL" = $COLLECTIONURL
-    "PROJECT" = $PROJECT
-    "AGENTPOOL" = $AGENTPOOL
-    "AZ_VMS" = $AZ_VMS
-    "AZ_RG" = $AZ_RG
+    "COLLECTIONURL" = $CollectionURL
+    "PROJECT" = $Project
+    "AGENTPOOL" = $AgentPool
+    "AZ_VMS" = $Az_VMs
+    "AZ_RG" = $Az_RG
     "ADO_PAT" = $ADO_PAT
-    "AZ_TENANTID" = $AZ_TENANTID
-    "AZ_CLIENTID" = $AZ_CLIENTID
-    "AZ_CLIENT_SECRET" = $AZ_CLIENT_SECRET
-    "AZ_SUBSCRIPTIONID" = $AZ_SUBSCRIPTIONID
-    "VMList" = $AZ_VMS -split ","
+    "AZ_TENANTID" = $Az_TenantID
+    "AZ_CLIENTID" = $Az_ClientID
+    "AZ_CLIENT_SECRET" = $Az_Client_Secret
+    "AZ_SUBSCRIPTIONID" = $Az_SubscriptionID
+    "VMList" = $Az_VMs -split ","
     "Name" = $prefix
 }
 
