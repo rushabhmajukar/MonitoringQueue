@@ -1,11 +1,15 @@
 param (
-    [string[]]$EnvironmentPrefixes,
-
-    [Parameter(Mandatory = $true)]
-    [hashtable]$ProLS_Params,
-
-    [Parameter(Mandatory = $true)]
-    [hashtable]$ProDR_Params
+    [string]$prefix,
+    [string]$COLLECTIONURL,
+    [string]$PROJECT,
+    [string]$AGENTPOOL,
+    [string]$AZ_VMS,
+    [string]$AZ_RG,
+    [string]$ADO_PAT,
+    [string]$AZ_TENANTID,
+    [string]$AZ_CLIENTID,
+    [string]$AZ_CLIENT_SECRET,
+    [string]$AZ_SUBSCRIPTIONID
 )
 
 function Monitor-And-Scale {
@@ -59,6 +63,15 @@ function Monitor-And-Scale {
         $agents = (Invoke-RestMethod -Uri $agentsUrl -Headers $headers).value
         $idleAgents = $agents | Where-Object { $_.status -eq "online" -and -not $_.assignedRequest }
 
+        if ($envContext["Name"] -eq "ProDR") {
+            foreach ($agent in $idleAgents) {
+                $vmName = $envContext["VMList"] | Where-Object { $_ -like "*$($agent.name)*" }
+                if ($vmName) {
+                    Write-Host "Stopping VM: $vmName"
+                    Stop-AzVM -Name $vmName -ResourceGroupName $envContext["AZ_RG"] -Force
+                }
+            }
+        }
         if ($idleAgents.Count -gt 1) {
             $agentsToStop = $idleAgents | Select-Object -Skip 1
             foreach ($agent in $agentsToStop) {
@@ -69,31 +82,28 @@ function Monitor-And-Scale {
                 }
             }
         } else {
-            Write-Host "Only one idle agent; skipping shutdown."
+            Write-Host "No action required, skipping shutdown."
         }
     }
 
-    # Disconnect the Azure session
+    # 💡 Good practice: Close the Azure session
     Disconnect-AzAccount | Out-Null
 }
 
-# Main Loop for All Envs
-foreach ($prefix in $EnvironmentPrefixes) {
-    try {
-        if ($prefix -eq "ProLS") {
-            $context = $ProLS_Params
-        } elseif ($prefix -eq "ProDR") {
-            $context = $ProDR_Params
-        } else {
-            throw "Unknown environment prefix: $prefix"
-        }
-
-        # Prepare final context
-        $context["VMList"] = $context["AZ_VMS"] -split ","
-        $context["Name"] = $prefix
-
-        Monitor-And-Scale -envContext $context
-    } catch {
-        Write-Error "Failed for environment prefix '$prefix': $_"
-    }
+# Prepare environment context
+$envContext = @{
+    "COLLECTIONURL" = $COLLECTIONURL
+    "PROJECT" = $PROJECT
+    "AGENTPOOL" = $AGENTPOOL
+    "AZ_VMS" = $AZ_VMS
+    "AZ_RG" = $AZ_RG
+    "ADO_PAT" = $ADO_PAT
+    "AZ_TENANTID" = $AZ_TENANTID
+    "AZ_CLIENTID" = $AZ_CLIENTID
+    "AZ_CLIENT_SECRET" = $AZ_CLIENT_SECRET
+    "AZ_SUBSCRIPTIONID" = $AZ_SUBSCRIPTIONID
+    "VMList" = $AZ_VMS -split ","
+    "Name" = $prefix
 }
+
+Monitor-And-Scale -envContext $envContext
