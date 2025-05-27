@@ -1,0 +1,99 @@
+param (
+    [string[]]$EnvironmentPrefixes,
+
+    [Parameter(Mandatory = $true)]
+    [hashtable]$ProLS_Params,
+
+    [Parameter(Mandatory = $true)]
+    [hashtable]$ProDR_Params
+)
+
+function Monitor-And-Scale {
+    param (
+        [hashtable]$envContext
+    )
+
+    Write-Host "`n===== Checking: $($envContext.Name) ($($envContext.AGENTPOOL)) ====="
+
+    # Azure Login
+    $securePassword = ConvertTo-SecureString $envContext["AZ_CLIENT_SECRET"] -AsPlainText -Force
+    $cred = New-Object PSCredential ($envContext["AZ_CLIENTID"], $securePassword)
+    Connect-AzAccount -ServicePrincipal -TenantId $envContext["AZ_TENANTID"] -Credential $cred | Out-Null
+    Set-AzContext -SubscriptionId $envContext["AZ_SUBSCRIPTIONID"] | Out-Null
+
+    # Azure DevOps API Auth
+    $base64AuthInfo = [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes(":$($envContext["ADO_PAT"])"))
+    $headers = @{
+        Authorization = "Basic $base64AuthInfo"
+        "Content-Type" = "application/json"
+    }
+
+    # Get Agent Pool ID
+    $poolUrl = "$($envContext["COLLECTIONURL"])/_apis/distributedtask/pools?api-version=6.0"
+    $poolResp = Invoke-RestMethod -Uri $poolUrl -Headers $headers -Method Get
+    $poolId = ($poolResp.value | Where-Object { $_.name -eq $envContext["AGENTPOOL"] }).id
+
+    # Check queued builds
+    $buildUrl = "$($envContext["COLLECTIONURL"])/$($envContext["PROJECT"])/_apis/build/builds?statusFilter=notStarted`&api-version=6.0"
+    $buildResp = Invoke-RestMethod -Uri $buildUrl -Headers $headers -Method Get
+    $queuedCount = $buildResp.count
+
+    if ($queuedCount -gt 0) {
+        Write-Host "Builds in queue: $queuedCount"
+
+        $agentsUrl = "$($envContext["COLLECTIONURL"])/_apis/distributedtask/pools/$poolId/agents?api-version=6.0"
+        $agents = (Invoke-RestMethod -Uri $agentsUrl -Headers $headers).value
+        $offlineAgents = $agents | Where-Object { $_.status -eq "offline" }
+
+        foreach ($agent in $offlineAgents) {
+            $vmName = $envContext["VMList"] | Where-Object { $_ -like "*$($agent.name)*" }
+            if ($vmName) {
+                Write-Host "Starting VM: $vmName"
+                Start-AzVM -Name $vmName -ResourceGroupName $envContext["AZ_RG"]
+            }
+        }
+    } else {
+        Write-Host "No builds in queue. Checking idle agents..."
+
+        $agentsUrl = "$($envContext["COLLECTIONURL"])/_apis/distributedtask/pools/$poolId/agents?includeAssignedRequest=true`&api-version=6.0"
+        $agents = (Invoke-RestMethod -Uri $agentsUrl -Headers $headers).value
+        $idleAgents = $agents | Where-Object { $_.status -eq "online" -and -not $_.assignedRequest }
+
+        if ($idleAgents.Count -gt 1) {
+            $agentsToStop = $idleAgents | Select-Object -Skip 1
+            foreach ($agent in $agentsToStop) {
+                $vmName = $envContext["VMList"] | Where-Object { $_ -like "*$($agent.name)*" }
+                if ($vmName) {
+                    Write-Host "Stopping VM: $vmName"
+                    Stop-AzVM -Name $vmName -ResourceGroupName $envContext["AZ_RG"] -Force
+                }
+            }
+        } else {
+            Write-Host "Only one idle agent; skipping shutdown."
+        }
+    }
+
+    # Disconnect the Azure session
+    Disconnect-AzAccount | Out-Null
+}
+
+# Main Loop for All Envs
+foreach ($prefix in $EnvironmentPrefixes) {
+    try {
+        if ($prefix -eq "ProLS") {
+            $context = $ProLS_Params
+        } elseif ($prefix -eq "ProDR") {
+            $context = $ProDR_Params
+        } else {
+            throw "Unknown environment prefix: $prefix"
+        }
+
+        # Prepare final context
+        $context["VMList"] = $context["AZ_VMS"] -split ","
+        $context["Name"] = $prefix
+
+        Monitor-And-Scale -envContext $context
+    } catch {
+        Write-Error "Failed for environment prefix '$prefix': $_"
+    }
+}
