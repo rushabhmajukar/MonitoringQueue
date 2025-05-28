@@ -6,3 +6,6 @@ At C:\azp\agent\_work\15\s\Try.ps1:86 char:60
     + FullyQualifiedErrorId : System.ArgumentException,Microsoft.PowerShell.Commands.ConvertFromJsonCommand
  
 ##[error]PowerShell exited with code '1'
+
+[{"VMName":"VM1","ResourceGroup":"RG1","SubscriptionID":"279826764-78e2db-y21676"},{"VMName":"VM2","ResourceGroup":"RG2","SubscriptionID":"783245-bcdwbgf-jhwduhyg"}]
+
