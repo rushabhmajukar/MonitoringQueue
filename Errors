@@ -1,0 +1,8 @@
+ConvertFrom-Json : Invalid JSON primitive: VM1.
+At C:\azp\agent\_work\15\s\Try.ps1:86 char:60
++ ...       $vmMappings = $envContext["AZ_VMS_RGs_Subs"] | ConvertFrom-Json
++                                                          ~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (:) [ConvertFrom-Json], ArgumentException
+    + FullyQualifiedErrorId : System.ArgumentException,Microsoft.PowerShell.Commands.ConvertFromJsonCommand
+ 
+##[error]PowerShell exited with code '1'
