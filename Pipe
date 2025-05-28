@@ -1,0 +1,41 @@
+trigger: none
+
+pool:
+  name: 'abc'
+
+steps:
+- task: PowerShell@2
+  displayName: 'Monitor Build script for ProLS'
+  inputs:
+    filePath: 'abc.ps1'
+    arguments: >
+      -prefix 'ProLS'
+      -COLLECTIONURL '$(ProLS_CollectionURL)'
+      -PROJECT '$(ProLS_Project)'
+      -AGENTPOOL '$(ProLS_AgentPool)'
+      -AZ_VMS '$(ProLS_Az_VMs)'
+      -AZ_RG '$(ProLS_Az_RG)'
+      -ADO_PAT '$(ProLS_ADO_PAT)'
+      -AZ_TENANTID '$(ProLS_Az_TenantID)'
+      -AZ_CLIENTID '$(ProLS_Az_ClientID)'
+      -AZ_CLIENT_SECRET '$(ProLS_Az_Client_Secret)'
+      -AZ_SUBSCRIPTIONID '$(ProLS_Az_SubscriptionID)'
+    pwsh: false
+
+- task: PowerShell@2
+  displayName: 'Monitor Build script for ProDR'
+  inputs:
+    filePath: 'abc.ps1'
+    arguments: >
+      -prefix 'ProDR'
+      -COLLECTIONURL '$(ProDR_CollectionURL)'
+      -PROJECT '$(ProDR_Project)'
+      -AGENTPOOL '$(ProDR_AgentPool)'
+      -AZ_VMS '$(ProDR_Az_VMs)'
+      -AZ_RG '$(ProDR_Az_RG)'
+      -ADO_PAT '$(ProDR_ADO_PAT)'
+      -AZ_TENANTID '$(ProDR_Az_TenantID)'
+      -AZ_CLIENTID '$(ProDR_Az_ClientID)'
+      -AZ_CLIENT_SECRET '$(ProDR_Az_Client_Secret)'
+      -AZ_SUBSCRIPTIONID '$(ProDR_Az_SubscriptionID)'
+    pwsh: false
