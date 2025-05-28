@@ -39,3 +39,19 @@ steps:
       -AZ_CLIENT_SECRET '$(ProDR_Az_Client_Secret)'
       -AZ_SUBSCRIPTIONID '$(ProDR_Az_SubscriptionID)'
     pwsh: false
+
+- task: PowerShell@2
+  displayName: 'Monitoring Script for ProAB Agent Pool'
+  inputs:
+    filePath: 'abc.ps1' 
+    arguments: >
+      -prefix 'ProAB'
+      -CollectionURL '$(ProAB_CollectionURL)'
+      -Project '$(ProAB_Project)'
+      -ADO_PAT '$(ProAB_ADO_PAT)'
+      -AgentPool '$(ProAB_AgentPool)'
+      -Az_TenantID '$(ProAB_Az_TenantID)'
+      -Az_ClientID '$(ProAB_Az_ClientID)'
+      -Az_Client_Secret '$(ProAB_Az_Client_Secret)'
+      -Az_VMs_RGs_Subs_Mapping '$(ProAB_Az_VMs_RGs_Subs)'
+    pwsh: false
