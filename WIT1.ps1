@@ -1,69 +1,62 @@
-# Variables
-$organization = "your_organization"
-$project = "your_project"
-$pat = "your_pat_here"   # 🔴 Use a PAT with work item read permissions
+# ------------------- CONFIGURATION -------------------
+# Replace these with your actual details
+$collectionUrl = "http://DomainName.local/Pro/tfs"
+$project = "YourProject"
+$agentPoolName = "ProAB"
+$adoPat = "YOUR_PERSONAL_ACCESS_TOKEN"
 
-# Base64-encoded PAT for authentication
-$base64AuthInfo = [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes(":$($pat)"))
-
-# Get today's date and calculate 10 days ago
-$tenDaysAgo = (Get-Date).AddDays(-10).ToString("yyyy-MM-ddTHH:mm:ssZ")
-
-# Query to find requirements assigned to you that changed in the last 10 days
-$query = @"
-SELECT [System.Id]
-FROM WorkItems
-WHERE
-    [System.WorkItemType] = 'Requirement'
-    AND [System.AssignedTo] = @Me
-    AND [System.ChangedDate] >= '$tenDaysAgo'
-"@
-
-# Create query in Azure DevOps
-$wiqlBody = @{
-    query = $query
-} | ConvertTo-Json
-
-$uri = "https://dev.azure.com/$organization/$project/_apis/wit/wiql?api-version=7.1-preview.2"
-
-$response = Invoke-RestMethod -Uri $uri -Method Post -Body $wiqlBody -Headers @{
+# -----------------------------------------------------
+# Base64 encode PAT for authentication
+$base64AuthInfo = [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes(":$adoPat"))
+$headers = @{
     Authorization = "Basic $base64AuthInfo"
     "Content-Type" = "application/json"
 }
 
-# Extract work item IDs
-$workItemIds = $response.workItems.id
+# Get agent pool ID
+$poolUrl = "$collectionUrl/_apis/distributedtask/pools?api-version=6.0"
+$pools = (Invoke-RestMethod -Uri $poolUrl -Headers $headers).value
+$poolId = ($pools | Where-Object { $_.name -eq $agentPoolName }).id
+Write-Host "Agent Pool ID: $poolId"
 
-if ($workItemIds.Count -eq 0) {
-    Write-Output "No requirements found assigned to you in the last 10 days."
-    return
-}
+# Get builds that are notStarted or inProgress
+$buildUrl = "$collectionUrl/$project/_apis/build/builds?statusFilter=notStarted,inProgress&api-version=6.0"
+$builds = (Invoke-RestMethod -Uri $buildUrl -Headers $headers).value
+Write-Host "Total builds in queue (not started/in progress): $($builds.Count)"
 
-# Create a list to hold all revision history entries
-$historyList = @()
+$buildsUsingPool = @()
 
-# Loop through work item IDs and get their revisions
-foreach ($id in $workItemIds) {
-    Write-Output "`n=== Work Item ID: $id ==="
-    $revisionsUri = "https://dev.azure.com/$organization/$project/_apis/wit/workitems/$id/revisions?api-version=7.1-preview.3"
-    $revisions = Invoke-RestMethod -Uri $revisionsUri -Headers @{Authorization = "Basic $base64AuthInfo"}
-    
-    foreach ($rev in $revisions.value) {
-        $entry = [PSCustomObject]@{
-            WorkItemId = $id
-            Revision = $rev.rev
-            ChangedBy = $rev.fields."System.ChangedBy".displayName
-            ChangedDate = $rev.fields."System.ChangedDate"
-            State = $rev.fields."System.State"
-            Title = $rev.fields."System.Title"
+foreach ($build in $builds) {
+    if ($build.orchestrationPlan) {
+        $timelineUrl = "$collectionUrl/$project/_apis/build/builds/$($build.id)/timeline?api-version=6.0"
+        try {
+            $timeline = Invoke-RestMethod -Uri $timelineUrl -Headers $headers -ErrorAction Stop
+
+            # Find job records with an agent assigned
+            $agentRecords = $timeline.records | Where-Object { $_.recordType -eq "Job" -and $_.agentId }
+            foreach ($record in $agentRecords) {
+                # Check if the agent belongs to the specified pool
+                $agentUrl = "$collectionUrl/_apis/distributedtask/pools/$poolId/agents/$($record.agentId)?api-version=6.0"
+                try {
+                    $agent = Invoke-RestMethod -Uri $agentUrl -Headers $headers -ErrorAction Stop
+                    if ($agent) {
+                        $buildsUsingPool += $build
+                        Write-Host "Build $($build.id) is using agent pool $agentPoolName."
+                        break # Build is using this pool, skip to next build
+                    }
+                } catch {
+                    # Agent not found in this pool, skip
+                }
+            }
+        } catch {
+            Write-Warning "Could not get timeline for build $($build.id): $_"
         }
-        # Add to the list
-        $historyList += $entry
     }
 }
 
-# Output to CSV file
-$outputPath = "C:\Temp\RevisionHistory.csv"
-$historyList | Export-Csv -Path $outputPath -NoTypeInformation -Encoding UTF8
+Write-Host "`nBuilds using agent pool '$agentPoolName': $($buildsUsingPool.Count)"
+Write-Host "Build IDs: $($buildsUsingPool.id -join ', ')"
 
-Write-Output "Revision history saved to $outputPath"
+# Disconnect to avoid session clutter
+Disconnect-AzAccount -ErrorAction SilentlyContinue
+
