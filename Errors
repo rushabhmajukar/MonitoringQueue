@@ -1,5 +1,5 @@
 Agent Pool ID of (PROAB): 7
-Agent Queue IDs in pool 'PROPHETCI': 6
+Agent Queue IDs in pool 'PROAB': 6
 
 Builds using agent pool 'PROAB': @{_links=; properties=; tags=System.Object[]; validationResults=System.Object[]; plans=System.Object[]; triggerInfo=; id=77347; buildNumber=20250603.2; status=inProgress; queueTime=2025-06-03T05:14:16.3092367Z; startTime=2025-06-03T05:14:18.8167023Z; url=http://vwmazbldtfs.fisdev.local:8080/tfs/Prophet/927ba717-ba64-40bd-b89f-a8ccace730d3/_apis/build/Builds/77347; definition=; buildNumberRevision=2; project=; uri=vstfs:///Build/Build/77347; sourceBranch=refs/heads/main; sourceVersion=9f6ba447a8cb360d6a7b58f4fc461794564a44e7; queue=; priority=normal; reason=manual; requestedFor=; requestedBy=; lastChangedDate=2025-06-03T05:14:18.827Z; lastChangedBy=; orchestrationPlan=; logs=; repository=; keepForever=False; retainedByRelease=False; triggeredByBuild=}
 Cannot compare "@{_links=; properties=; tags=System.Object[]; validationResults=System.Object[]; 
