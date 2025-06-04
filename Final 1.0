@@ -1,0 +1,115 @@
+param (
+    [string]$Name,
+    [string]$CollectionURL,
+    [string]$Project,
+    [string]$AgentPool,
+    [string]$Az_VMs,
+    [string]$Az_RG,
+    [string]$ADO_PAT,
+    [string]$Az_TenantID,
+    [string]$Az_ClientID,
+    [string]$Az_Client_Secret,
+    [string]$Az_SubscriptionID,
+    [string]$Az_VMs_RGs_Subs_Mapping
+)
+
+Write-Host "`n===== Checking: ($AgentPool) ====="
+
+# Azure Login
+$securePassword = ConvertTo-SecureString $Az_Client_Secret -AsPlainText -Force
+$cred = New-Object PSCredential ($Az_ClientID, $securePassword)
+Connect-AzAccount -ServicePrincipal -TenantId $Az_TenantID -Credential $cred | Out-Null
+
+# Azure DevOps API Auth
+$base64AuthInfo = [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes(":$ADO_PAT"))
+$headers = @{
+    Authorization = "Basic $base64AuthInfo"
+    "Content-Type" = "application/json"
+}
+
+# Get Agent Pool ID
+$poolUrl = "$CollectionURL/_apis/distributedtask/pools?api-version=6.0"
+$poolResp = Invoke-RestMethod -Uri $poolUrl -Headers $headers -Method Get
+$poolId = ($poolResp.value | Where-Object { $_.name -eq $AgentPool }).id
+
+# Check queued builds
+$buildUrl = "$CollectionURL/$Project/_apis/build/builds?statusFilter=notStarted&api-version=6.0"
+$buildResp = Invoke-RestMethod -Uri $buildUrl -Headers $headers -Method Get
+$queuedCount = $buildResp.count
+
+if ($queuedCount -gt 0) {
+    Write-Host "Builds in queue: $queuedCount"
+
+    $agentsUrl = "$CollectionURL/_apis/distributedtask/pools/$poolId/agents?api-version=6.0"
+    $agents = (Invoke-RestMethod -Uri $agentsUrl -Headers $headers).value
+    $offlineAgents = $agents | Where-Object { $_.status -eq "offline" }
+
+    foreach ($agent in $offlineAgents) {
+        if ($Name -eq "ProAB") {
+            $mapping = ($Az_VMs_RGs_Subs_Mapping | ConvertFrom-Json) | Where-Object { $_.VMName -eq $agent.name }
+            if ($mapping) {
+                Write-Host "Starting VM: $($mapping.VMName)"
+                Set-AzContext -SubscriptionId $mapping.SubscriptionID | Out-Null
+                Start-AzVM -Name $mapping.VMName -ResourceGroupName $mapping.ResourceGroup
+            }
+        } else {
+            $vmList = $Az_VMs -split ","
+            $vmName = $vmList | Where-Object { $_ -like "*$($agent.name)*" }
+            if ($vmName) {
+                Write-Host "Starting VM: $vmName"
+                Set-AzContext -SubscriptionId $Az_SubscriptionID | Out-Null
+                Start-AzVM -Name $vmName -ResourceGroupName $Az_RG
+            }
+        }
+    }
+} else {
+    Write-Host "No builds in queue. Checking idle agents..."
+
+    $agentsUrl = "$CollectionURL/_apis/distributedtask/pools/$poolId/agents?includeAssignedRequest=true&api-version=6.0"
+    $agents = (Invoke-RestMethod -Uri $agentsUrl -Headers $headers).value
+    $idleAgents = $agents | Where-Object { $_.status -eq "online" -and -not $_.assignedRequest }
+
+    if ($Name -eq "ProDR") {
+        $vmList = $Az_VMs -split ","
+        foreach ($agent in $idleAgents) {
+            $vmName = $vmList | Where-Object { $_ -like "*$($agent.name)*" }
+            if ($vmName) {
+                Write-Host "Stopping VM: $vmName"
+                Set-AzContext -SubscriptionId $Az_SubscriptionID | Out-Null
+                Stop-AzVM -Name $vmName -ResourceGroupName $Az_RG -Force
+            }
+        }
+    } elseif ($Name -eq "ProAB") {
+        $vmMappings = $Az_VMs_RGs_Subs_Mapping | ConvertFrom-Json
+        if ($idleAgents.Count -gt 1) {
+            $agentsToStop = $idleAgents | Select-Object -Skip 1
+            foreach ($agent in $agentsToStop) {
+                $mapping = $vmMappings | Where-Object { $_.VMName -eq $agent.name }
+                if ($mapping) {
+                    Write-Host "Stopping VM: $($mapping.VMName)"
+                    Set-AzContext -SubscriptionId $mapping.SubscriptionID | Out-Null
+                    Stop-AzVM -Name $mapping.VMName -ResourceGroupName $mapping.ResourceGroup -Force
+                }
+            }
+        } else {
+            Write-Host "No action required, skipping shutdown."
+        }
+    } else {
+        $vmList = $Az_VMs -split ","
+        if ($idleAgents.Count -gt 1) {
+            $agentsToStop = $idleAgents | Select-Object -Skip 1
+            foreach ($agent in $agentsToStop) {
+                $vmName = $vmList | Where-Object { $_ -like "*$($agent.name)*" }
+                if ($vmName) {
+                    Write-Host "Stopping VM: $vmName"
+                    Set-AzContext -SubscriptionId $Az_SubscriptionID | Out-Null
+                    Stop-AzVM -Name $vmName -ResourceGroupName $Az_RG -Force
+                }
+            }
+        } else {
+            Write-Host "No action required, skipping shutdown."
+        }
+    }
+}
+
+Disconnect-AzAccount | Out-Null
