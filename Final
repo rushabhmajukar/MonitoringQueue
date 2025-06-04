@@ -33,14 +33,24 @@ function Monitor-And-Scale {
     }
 
     # Get Agent Pool ID
-    $poolUrl = "$($envContext["COLLECTIONURL"])/_apis/distributedtask/pools?api-version=6.0"
+    $poolUrl = "$($envContext["CollectionURL"])/_apis/distributedtask/pools?api-version=6.0"
     $poolResp = Invoke-RestMethod -Uri $poolUrl -Headers $headers -Method Get
-    $poolId = ($poolResp.value | Where-Object { $_.name -eq $envContext["AGENTPOOL"] }).id
+    $poolId = ($poolResp.value | Where-Object { $_.name -eq $envContext["AgentPool"] }).id
+    Write-Host "Agent Pool ID of ($($envContext.Agentpool)): $poolId"
+    
+    # Get agent queues in this pool
+    $queueUrl = "$($envContext["CollectionURL"])/$($envContext["Project"])/_apis/distributedtask/queues?poolIds=$poolId&api-version=6.0-preview"
+    $queues = (Invoke-RestMethod -Uri $queueUrl -Headers $headers -Method Get).value
+    $queueIds = $queues.id
+    Write-Host "Agent Queue IDs in pool '$($envContext.Agentpool)': $($queueIds -join ', ')"
 
-    # Check queued builds
-    $buildUrl = "$($envContext["COLLECTIONURL"])/$($envContext["PROJECT"])/_apis/build/builds?statusFilter=notStarted`&api-version=6.0"
-    $buildResp = Invoke-RestMethod -Uri $buildUrl -Headers $headers -Method Get
-    $queuedCount = $buildResp.count
+    $buildUrl = "$($envContext["CollectionURL"])/$($envContext["Project"])/_apis/build/builds?statusFilter=notStarted,inProgress&api-version=6.0"
+    Write-Host "Build URL $buildUrl"
+    $builds = (Invoke-RestMethod -Uri $buildUrl -Headers $headers -Method Get).value
+    
+    $buildsUsingPool = $builds | Where-Object { $queueIds -contains $_.queue.id }
+    $queuedCount = $buildsUsingPool.Count
+    Write-Host "`nBuilds using agent pool '$($envContext.Agentpool)': $queuedCount"
 
     if ($queuedCount -gt 0) {
         Write-Host "Builds in queue: $queuedCount"
