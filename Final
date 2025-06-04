@@ -93,16 +93,38 @@ function Monitor-And-Scale {
                 }
             }
         } elseif ($envContext["Name"] -eq "ProAB") {
-            $vmMappings = $envContext["AZ_VMS_RGs_Subs"] | ConvertFrom-Json
-            if ($idleAgents.Count -gt 1) {
-                $agentsToStop = $idleAgents | Select-Object -Skip 1
-                foreach ($agent in $agentsToStop) {
-                    $mapping = $vmMappings | Where-Object { $_.VMName -eq $agent.name }
-                    if ($mapping) {
-                        Write-Host "Stopping VM: $($mapping.VMName)"
-                        Set-AzContext -SubscriptionId $mapping.SubscriptionID | Out-Null
-                        Stop-AzVM -Name $mapping.VMName -ResourceGroupName $mapping.ResourceGroup -Force
+            $vmMappings = $envContext["Az_VMs_RGs_Subs"] | ConvertFrom-Json
+            $idleMapped = foreach ($agent in $idleAgents) {
+                $map = $vmMappings | Where-Object { $_.VMName -eq $agent.name }
+                if ($map) {
+                    [PSCustomObject]@{
+                        Agent = $agent
+                        VMName = $map.VMName
+                        ResourceGroup = $map.ResourceGroup
+                        SubscriptionID = $map.SubscriptionID
+                        OSType = $map.OSType
                     }
+                }
+            }
+
+            $windows11Idle = $idleMapped | Where-Object { $_.OSType -eq "Windows11" }
+            $windowsServerIdle = $idleMapped | Where-Object { $_.OSType -eq "WindowsSever2022" }
+
+            $agentsToStop = @()
+
+            if ($windows11Idle.Count -gt 2) {
+                $agentsToStop += $windows11Idle | Select-Object -Skip 2
+            }
+
+            if ($windowsServerIdle.Count -gt 2) {
+                $agentsToStop += $windowsServerIdle | Select-Object -Skip 2
+            }
+
+            if ($agentsToStop.Count -gt 0) {
+                foreach ($entry in $agentsToStop) {
+                    Write-Host " Stopping VM: $($entry.VMName)"
+                    Set-AzContext -SubscriptionId $entry.SubscriptionID | Out-Null
+                    Stop-AzVM -Name $entry.VMName -ResourceGroupName $entry.ResourceGroup -Force
                 }
             } else {
                 Write-Host "No action required, skipping shutdown."
