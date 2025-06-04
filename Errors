@@ -6,3 +6,6 @@ delimit the name.
     + CategoryInfo          : ParserError: (:) [], ParentContainsErrorRecordException
     + FullyQualifiedErrorId : InvalidVariableReferenceWithDrive
 
+The logic shouldn't be coupled to names of agent pools.
+It could take desired number of idle agents as input and maintain that number from its list of machines (passed either as a parameter or received from REST API)
+
