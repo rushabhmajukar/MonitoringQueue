@@ -1,28 +1,8 @@
-Agent Pool ID of (PROAB): 7
-Agent Queue IDs in pool 'PROAB': 6
-
-Builds using agent pool 'PROAB': @{_links=; properties=; tags=System.Object[]; validationResults=System.Object[]; plans=System.Object[]; triggerInfo=; id=77347; buildNumber=20250603.2; status=inProgress; queueTime=2025-06-03T05:14:16.3092367Z; startTime=2025-06-03T05:14:18.8167023Z; url=http://vwmazbldtfs.fisdev.local:8080/tfs/Prophet/927ba717-ba64-40bd-b89f-a8ccace730d3/_apis/build/Builds/77347; definition=; buildNumberRevision=2; project=; uri=vstfs:///Build/Build/77347; sourceBranch=refs/heads/main; sourceVersion=9f6ba447a8cb360d6a7b58f4fc461794564a44e7; queue=; priority=normal; reason=manual; requestedFor=; requestedBy=; lastChangedDate=2025-06-03T05:14:18.827Z; lastChangedBy=; orchestrationPlan=; logs=; repository=; keepForever=False; retainedByRelease=False; triggeredByBuild=}
-Cannot compare "@{_links=; properties=; tags=System.Object[]; validationResults=System.Object[]; 
-plans=System.Object[]; triggerInfo=; id=77347; buildNumber=20250603.2; status=inProgress; 
-queueTime=2025-06-03T05:14:16.3092367Z; startTime=2025-06-03T05:14:18.8167023Z; 
-url=http://DomainName.local:8080/tfs/Pro/927ba717-ba64-40bd-b89f-a8ccace730d3/_apis/build/Builds/77347; 
-definition=; buildNumberRevision=2; project=; uri=vstfs:///Build/Build/77347; sourceBranch=refs/heads/main; 
-sourceVersion=9f6ba447a8cb360d6a7b58f4fc461794564a44e7; queue=; priority=normal; reason=manual; requestedFor=; 
-requestedBy=; lastChangedDate=2025-06-03T05:14:18.827Z; lastChangedBy=; orchestrationPlan=; logs=; repository=; 
-keepForever=False; retainedByRelease=False; triggeredByBuild=}" to "0" because the objects are not the same type or 
-the object "@{_links=; properties=; tags=System.Object[]; validationResults=System.Object[]; plans=System.Object[]; 
-triggerInfo=; id=77347; buildNumber=20250603.2; status=inProgress; queueTime=2025-06-03T05:14:16.3092367Z; 
-startTime=2025-06-03T05:14:18.8167023Z; 
-url=http://DomainName.local:8080/tfs/Pro/927ba717-ba64-40bd-b89f-a8ccace730d3/_apis/build/Builds/77347; 
-definition=; buildNumberRevision=2; project=; uri=vstfs:///Build/Build/77347; sourceBranch=refs/heads/main; 
-sourceVersion=9f6ba447a8cb360d6a7b58f4fc461794564a44e7; queue=; priority=normal; reason=manual; requestedFor=; 
-requestedBy=; lastChangedDate=2025-06-03T05:14:18.827Z; lastChangedBy=; orchestrationPlan=; logs=; repository=; 
-keepForever=False; retainedByRelease=False; triggeredByBuild=}" does not implement "IComparable".
-At C:\azp\agent\_work\15\s\Try.ps1:54 char:9
-+     if ($queuedCount -gt 0) {
-+         ~~~~~~~~~~~~~~~~~~
-    + CategoryInfo          : NotSpecified: (:) [], ParentContainsErrorRecordException
-    + FullyQualifiedErrorId : PSObjectCompareTo
- 
-##[error]PowerShell exited with code '1'.
+At C:\azp\agent\_work\15\s\TestingScale.ps1:34 char:30
++ Write-Host "Agent Pool ID of $AgentPool: $poolId"
++                              ~~~~~~~~~~~
+Variable reference is not valid. ':' was not followed by a valid variable name character. Consider using ${} to 
+delimit the name.
+    + CategoryInfo          : ParserError: (:) [], ParentContainsErrorRecordException
+    + FullyQualifiedErrorId : InvalidVariableReferenceWithDrive
 
