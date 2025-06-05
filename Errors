@@ -10,3 +10,7 @@ Missing '(' after 'elseif' in if statement.
 The logic shouldn't be coupled to names of agent pools.
 It could take desired number of idle agents as input and maintain that number from its list of machines (passed either as a parameter or received from REST API)
 
+The engine "node" is incompatible with this module. Expected version ">=20.15.0". Got 
+"16.16.0"
+
+
