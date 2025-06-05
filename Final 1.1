@@ -7,12 +7,12 @@ param (
     [string]$Az_ClientID,
     [string]$Az_Client_Secret,
     [string]$Az_SubscriptionID,
-    [string]$Az_VMs = "",
-    [string]$Az_RG = "",
-    [string]$OSTypeBasedMappingsJson = "",  # Optional JSON mapping with VMName, ResourceGroup, SubscriptionID, OSType
-    [int]$DesiredIdleWindows11 = 2,
-    [int]$DesiredIdleWindowsServer = 2,
-    [int]$DefaultIdleAgents = 1
+    [string]$Az_VMs,
+    [string]$Az_RG,
+    [string]$AgentsMappingJson = "",
+    [int]$MinWindows11Agents,
+    [int]$MinWindowsServerAgents,
+    [int]$MinAgentsToKeepOnline = 1
 )
 
 Write-Host "`n===== Checking Agent Pool: $AgentPool ====="
@@ -53,8 +53,8 @@ $agents = (Invoke-RestMethod -Uri $agentsUrl -Headers $headers).value
 
 # Convert JSON Mapping if provided
 $mappings = @()
-if ($OSTypeBasedMappingsJson) {
-    $mappings = $OSTypeBasedMappingsJson | ConvertFrom-Json
+if ($AgentsMappingJson) {
+    $mappings = $AgentsMappingJson | ConvertFrom-Json
 }
 
 # Start VMs for offline agents if builds are queued
@@ -68,7 +68,7 @@ if ($queuedCount -gt 0) {
                 Set-AzContext -SubscriptionId $mapping.SubscriptionID | Out-Null
                 Start-AzVM -Name $mapping.VMName -ResourceGroupName $mapping.ResourceGroup
             }
-        } elseif ($Az_VMs -and $Az_RG -and $Az_SubscriptionID) {
+        } elseif {
             $vmList = $Az_VMs -split ","
             $vmName = $vmList | Where-Object { $_ -like "*$($agent.name)*" }
             if ($vmName) {
@@ -100,11 +100,11 @@ if ($queuedCount -gt 0) {
         $windowsServerIdle = $idleMapped | Where-Object { $_.OSType -eq "WindowsServer2022" }
 
         $agentsToStop = @()
-        if ($windows11Idle.Count -gt $DesiredIdleWindows11) {
-            $agentsToStop += $windows11Idle | Select-Object -Skip $DesiredIdleWindows11
+        if ($windows11Idle.Count -gt $MinWindows11Agents) {
+            $agentsToStop += $windows11Idle | Select-Object -Skip $MinWindows11Agents
         }
-        if ($windowsServerIdle.Count -gt $DesiredIdleWindowsServer) {
-            $agentsToStop += $windowsServerIdle | Select-Object -Skip $DesiredIdleWindowsServer
+        if ($windowsServerIdle.Count -gt $MinWindowsServerAgents) {
+            $agentsToStop += $windowsServerIdle | Select-Object -Skip $MinWindowsServerAgents
         }
 
         foreach ($entry in $agentsToStop) {
@@ -112,8 +112,8 @@ if ($queuedCount -gt 0) {
             Set-AzContext -SubscriptionId $entry.SubscriptionID | Out-Null
             Stop-AzVM -Name $entry.VMName -ResourceGroupName $entry.ResourceGroup -Force
         }
-    } elseif ($idleAgents.Count -gt $DefaultIdleAgents) {
-        $agentsToStop = $idleAgents | Select-Object -Skip $DefaultIdleAgents
+    } elseif ($idleAgents.Count -gt $MinAgentsToKeepOnline) {
+        $agentsToStop = $idleAgents | Select-Object -Skip $MinAgentsToKeepOnline
         foreach ($agent in $agentsToStop) {
             $vmList = $Az_VMs -split ","
             $vmName = $vmList | Where-Object { $_ -like "*$($agent.name)*" }
