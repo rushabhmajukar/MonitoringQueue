@@ -31,11 +31,20 @@ $headers = @{
 $poolUrl = "$CollectionURL/_apis/distributedtask/pools?api-version=6.0"
 $poolResp = Invoke-RestMethod -Uri $poolUrl -Headers $headers -Method Get
 $poolId = ($poolResp.value | Where-Object { $_.name -eq $AgentPool }).id
+Write-Host "Agent Pool ID of ${AgentPool}: $poolId"
+    
+# Get agent queues in this pool
+$queueUrl = "$CollectionURL/$Project/_apis/distributedtask/queues?poolIds=$poolId&api-version=6.0-preview"
+$queues = (Invoke-RestMethod -Uri $queueUrl -Headers $headers -Method Get).value
+$queueIds = $queues.id
+Write-Host "Agent Queue IDs in pool '$AgentPool': $($queueIds -join ', ')"
 
-# Check queued builds
-$buildUrl = "$CollectionURL/$Project/_apis/build/builds?statusFilter=notStarted&api-version=6.0"
-$buildResp = Invoke-RestMethod -Uri $buildUrl -Headers $headers -Method Get
-$queuedCount = $buildResp.count
+$buildUrl = "$CollectionURL/$Project/_apis/build/builds?statusFilter=notStarted,inProgress&api-version=6.0"
+$builds = (Invoke-RestMethod -Uri $buildUrl -Headers $headers -Method Get).value
+    
+$buildsUsingPool = $builds | Where-Object { $queueIds -contains $_.queue.id }
+$queuedCount = $buildsUsingPool.Count
+Write-Host "`nBuilds using agent pool '$AgentPool': $queuedCount"
 
 if ($queuedCount -gt 0) {
     Write-Host "Builds in queue: $queuedCount"
