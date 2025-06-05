@@ -1,0 +1,131 @@
+param (
+    [string]$CollectionURL,
+    [string]$Project,
+    [string]$AgentPool,
+    [string]$ADO_PAT,
+    [string]$Az_TenantID,
+    [string]$Az_ClientID,
+    [string]$Az_Client_Secret,
+    [string]$Az_SubscriptionID,
+    [string]$Az_VMs = "",
+    [string]$Az_RG = "",
+    [string]$OSTypeBasedMappingsJson = "",  # Optional JSON mapping with VMName, ResourceGroup, SubscriptionID, OSType
+    [int]$DesiredIdleWindows11 = 2,
+    [int]$DesiredIdleWindowsServer = 2,
+    [int]$DefaultIdleAgents = 1
+)
+
+Write-Host "`n===== Checking Agent Pool: $AgentPool ====="
+
+# Azure Login
+$securePassword = ConvertTo-SecureString $Az_Client_Secret -AsPlainText -Force
+$cred = New-Object PSCredential ($Az_ClientID, $securePassword)
+Connect-AzAccount -ServicePrincipal -TenantId $Az_TenantID -Credential $cred | Out-Null
+
+# Azure DevOps API Auth
+$base64AuthInfo = [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes(":" + $ADO_PAT))
+$headers = @{
+    Authorization = "Basic $base64AuthInfo"
+    "Content-Type" = "application/json"
+}
+
+# Get Agent Pool ID
+$poolUrl = "$CollectionURL/_apis/distributedtask/pools?api-version=6.0"
+$poolResp = Invoke-RestMethod -Uri $poolUrl -Headers $headers -Method Get
+$poolId = ($poolResp.value | Where-Object { $_.name -eq $AgentPool }).id
+Write-Host "Agent Pool ID: $poolId"
+
+# Get Queue IDs
+$queueUrl = "$CollectionURL/$Project/_apis/distributedtask/queues?poolIds=$poolId&api-version=6.0-preview"
+$queues = (Invoke-RestMethod -Uri $queueUrl -Headers $headers -Method Get).value
+$queueIds = $queues.id
+
+# Get Builds
+$buildUrl = "$CollectionURL/$Project/_apis/build/builds?statusFilter=notStarted,inProgress&api-version=6.0"
+$builds = (Invoke-RestMethod -Uri $buildUrl -Headers $headers -Method Get).value
+$buildsUsingPool = $builds | Where-Object { $queueIds -contains $_.queue.id }
+$queuedCount = $buildsUsingPool.Count
+Write-Host "Queued Builds: $queuedCount"
+
+# Get Agents
+$agentsUrl = "$CollectionURL/_apis/distributedtask/pools/$poolId/agents?includeAssignedRequest=true&api-version=6.0"
+$agents = (Invoke-RestMethod -Uri $agentsUrl -Headers $headers).value
+
+# Convert JSON Mapping if provided
+$mappings = @()
+if ($OSTypeBasedMappingsJson) {
+    $mappings = $OSTypeBasedMappingsJson | ConvertFrom-Json
+}
+
+# Start VMs for offline agents if builds are queued
+if ($queuedCount -gt 0) {
+    $offlineAgents = $agents | Where-Object { $_.status -eq "offline" }
+    foreach ($agent in $offlineAgents) {
+        if ($mappings) {
+            $mapping = $mappings | Where-Object { $_.VMName -eq $agent.name }
+            if ($mapping) {
+                Write-Host "Starting VM: $($mapping.VMName)"
+                Set-AzContext -SubscriptionId $mapping.SubscriptionID | Out-Null
+                Start-AzVM -Name $mapping.VMName -ResourceGroupName $mapping.ResourceGroup
+            }
+        } elseif ($Az_VMs -and $Az_RG -and $Az_SubscriptionID) {
+            $vmList = $Az_VMs -split ","
+            $vmName = $vmList | Where-Object { $_ -like "*$($agent.name)*" }
+            if ($vmName) {
+                Write-Host "Starting VM: $vmName"
+                Set-AzContext -SubscriptionId $Az_SubscriptionID | Out-Null
+                Start-AzVM -Name $vmName -ResourceGroupName $Az_RG
+            }
+        }
+    }
+} else {
+    Write-Host "No builds queued. Checking idle agents..."
+    $idleAgents = $agents | Where-Object { $_.status -eq "online" -and -not $_.assignedRequest }
+
+    if ($mappings) {
+        $idleMapped = foreach ($agent in $idleAgents) {
+            $map = $mappings | Where-Object { $_.VMName -eq $agent.name }
+            if ($map) {
+                [PSCustomObject]@{
+                    Agent = $agent
+                    VMName = $map.VMName
+                    ResourceGroup = $map.ResourceGroup
+                    SubscriptionID = $map.SubscriptionID
+                    OSType = $map.OSType
+                }
+            }
+        }
+
+        $windows11Idle = $idleMapped | Where-Object { $_.OSType -eq "Windows11" }
+        $windowsServerIdle = $idleMapped | Where-Object { $_.OSType -eq "WindowsServer2022" }
+
+        $agentsToStop = @()
+        if ($windows11Idle.Count -gt $DesiredIdleWindows11) {
+            $agentsToStop += $windows11Idle | Select-Object -Skip $DesiredIdleWindows11
+        }
+        if ($windowsServerIdle.Count -gt $DesiredIdleWindowsServer) {
+            $agentsToStop += $windowsServerIdle | Select-Object -Skip $DesiredIdleWindowsServer
+        }
+
+        foreach ($entry in $agentsToStop) {
+            Write-Host "Stopping VM: $($entry.VMName)"
+            Set-AzContext -SubscriptionId $entry.SubscriptionID | Out-Null
+            Stop-AzVM -Name $entry.VMName -ResourceGroupName $entry.ResourceGroup -Force
+        }
+    } elseif ($idleAgents.Count -gt $DefaultIdleAgents) {
+        $agentsToStop = $idleAgents | Select-Object -Skip $DefaultIdleAgents
+        foreach ($agent in $agentsToStop) {
+            $vmList = $Az_VMs -split ","
+            $vmName = $vmList | Where-Object { $_ -like "*$($agent.name)*" }
+            if ($vmName) {
+                Write-Host "Stopping VM: $vmName"
+                Set-AzContext -SubscriptionId $Az_SubscriptionID | Out-Null
+                Stop-AzVM -Name $vmName -ResourceGroupName $Az_RG -Force
+            }
+        }
+    } else {
+        Write-Host "Idle agents within desired limits. No action taken."
+    }
+}
+
+Disconnect-AzAccount | Out-Null
