@@ -20,6 +20,7 @@ steps:
       -AZ_CLIENTID '$(ProLS_Az_ClientID)'
       -AZ_CLIENT_SECRET '$(ProLS_Az_Client_Secret)'
       -AZ_SUBSCRIPTIONID '$(ProLS_Az_SubscriptionID)'
+      -MinAgentsToKeepOnline '$(ProLS_MinAgentsToKeepOnline)'
     pwsh: false
 
 - task: PowerShell@2
@@ -38,6 +39,7 @@ steps:
       -AZ_CLIENTID '$(ProDR_Az_ClientID)'
       -AZ_CLIENT_SECRET '$(ProDR_Az_Client_Secret)'
       -AZ_SUBSCRIPTIONID '$(ProDR_Az_SubscriptionID)'
+      -MinAgentsToKeepOnline '$(ProDR_MinAgentsToKeepOnline)'
     pwsh: false
 
 - task: PowerShell@2
@@ -53,5 +55,8 @@ steps:
       -Az_TenantID '$(ProAB_Az_TenantID)'
       -Az_ClientID '$(ProAB_Az_ClientID)'
       -Az_Client_Secret '$(ProAB_Az_Client_Secret)'
-      -Az_VMs_RGs_Subs_Mapping '$(ProAB_Az_VMs_RGs_Subs)'
+      -AgentsMappingJson '$(ProAB_Az_VMs_RGs_Subs)'
+      -MinWindows11Agents '$(MinWindows11Agents)'
+      -MinWindowsServerAgents '$(MinWindowsServerAgents)'      
+      -MinAgentsToKeepOnline '$(ProAB_MinAgentsToKeepOnline)'
     pwsh: false
