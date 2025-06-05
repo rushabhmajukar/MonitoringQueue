@@ -18,12 +18,12 @@ function Monitor-And-Scale {
         [hashtable]$envContext
     )
 
-    Write-Host "`n===== Checking: ($($envContext.Agentpool)) ====="
+    Write-Host "`n===== Checking: ($($envContext.Agentpool)) Agent Pool ====="
 
     # Azure Login
-    $securePassword = ConvertTo-SecureString $envContext["AZ_CLIENT_SECRET"] -AsPlainText -Force
-    $cred = New-Object PSCredential ($envContext["AZ_CLIENTID"], $securePassword)
-    Connect-AzAccount -ServicePrincipal -TenantId $envContext["AZ_TENANTID"] -Credential $cred | Out-Null
+    $securePassword = ConvertTo-SecureString $envContext["Az_Client_Secret"] -AsPlainText -Force
+    $cred = New-Object PSCredential ($envContext["Az_ClientID"], $securePassword)
+    Connect-AzAccount -ServicePrincipal -TenantId $envContext["Az_TenantID"] -Credential $cred | Out-Null
 
     # Azure DevOps API Auth
     $base64AuthInfo = [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes(":$($envContext["ADO_PAT"])"))
@@ -45,7 +45,6 @@ function Monitor-And-Scale {
     Write-Host "Agent Queue IDs in pool '$($envContext.Agentpool)': $($queueIds -join ', ')"
 
     $buildUrl = "$($envContext["CollectionURL"])/$($envContext["Project"])/_apis/build/builds?statusFilter=notStarted,inProgress&api-version=6.0"
-    Write-Host "Build URL $buildUrl"
     $builds = (Invoke-RestMethod -Uri $buildUrl -Headers $headers -Method Get).value
     
     $buildsUsingPool = $builds | Where-Object { $queueIds -contains $_.queue.id }
@@ -53,15 +52,14 @@ function Monitor-And-Scale {
     Write-Host "`nBuilds using agent pool '$($envContext.Agentpool)': $queuedCount"
 
     if ($queuedCount -gt 0) {
-        Write-Host "Builds in queue: $queuedCount"
 
-        $agentsUrl = "$($envContext["COLLECTIONURL"])/_apis/distributedtask/pools/$poolId/agents?api-version=6.0"
+        $agentsUrl = "$($envContext["CollectionURL"])/_apis/distributedtask/pools/$poolId/agents?api-version=6.0"
         $agents = (Invoke-RestMethod -Uri $agentsUrl -Headers $headers).value
         $offlineAgents = $agents | Where-Object { $_.status -eq "offline" }
 
         foreach ($agent in $offlineAgents) {
             if ($envContext["Name"] -eq "ProAB") {
-                $mapping = ($envContext["AZ_VMS_RGs_Subs"] | ConvertFrom-Json) | Where-Object { $_.VMName -eq $agent.name }
+                $mapping = ($envContext["Az_VMs_RGs_Subs"] | ConvertFrom-Json) | Where-Object { $_.VMName -eq $agent.name }
                 if ($mapping) {
                     Write-Host "Starting VM: $($mapping.VMName)"
                     Set-AzContext -SubscriptionId $mapping.SubscriptionID | Out-Null
@@ -71,15 +69,15 @@ function Monitor-And-Scale {
                 $vmName = $envContext["VMList"] | Where-Object { $_ -like "*$($agent.name)*" }
                 if ($vmName) {
                     Write-Host "Starting VM: $vmName"
-                    Set-AzContext -SubscriptionId $envContext["AZ_SUBSCRIPTIONID"] | Out-Null
-                    Start-AzVM -Name $vmName -ResourceGroupName $envContext["AZ_RG"]
+                    Set-AzContext -SubscriptionId $envContext["Az_SubscriptionID"] | Out-Null
+                    Start-AzVM -Name $vmName -ResourceGroupName $envContext["Az_RG"]
                 }
             }
         }
     } else {
         Write-Host "No builds in queue. Checking idle agents..."
 
-        $agentsUrl = "$($envContext["COLLECTIONURL"])/_apis/distributedtask/pools/$poolId/agents?includeAssignedRequest=true`&api-version=6.0"
+        $agentsUrl = "$($envContext["CollectionURL"])/_apis/distributedtask/pools/$poolId/agents?includeAssignedRequest=true`&api-version=6.0"
         $agents = (Invoke-RestMethod -Uri $agentsUrl -Headers $headers).value
         $idleAgents = $agents | Where-Object { $_.status -eq "online" -and -not $_.assignedRequest }
 
@@ -88,8 +86,8 @@ function Monitor-And-Scale {
                 $vmName = $envContext["VMList"] | Where-Object { $_ -like "*$($agent.name)*" }
                 if ($vmName) {
                     Write-Host "Stopping VM: $vmName"
-                    Set-AzContext -SubscriptionId $envContext["AZ_SUBSCRIPTIONID"] | Out-Null
-                    Stop-AzVM -Name $vmName -ResourceGroupName $envContext["AZ_RG"] -Force
+                    Set-AzContext -SubscriptionId $envContext["Az_SubscriptionID"] | Out-Null
+                    Stop-AzVM -Name $vmName -ResourceGroupName $envContext["Az_RG"] -Force
                 }
             }
         } elseif ($envContext["Name"] -eq "ProAB") {
@@ -108,7 +106,7 @@ function Monitor-And-Scale {
             }
 
             $windows11Idle = $idleMapped | Where-Object { $_.OSType -eq "Windows11" }
-            $windowsServerIdle = $idleMapped | Where-Object { $_.OSType -eq "WindowsSever2022" }
+            $windowsServerIdle = $idleMapped | Where-Object { $_.OSType -eq "WindowsServer2022" }
 
             $agentsToStop = @()
 
@@ -136,8 +134,8 @@ function Monitor-And-Scale {
                     $vmName = $envContext["VMList"] | Where-Object { $_ -like "*$($agent.name)*" }
                     if ($vmName) {
                         Write-Host "Stopping VM: $vmName"
-                        Set-AzContext -SubscriptionId $envContext["AZ_SUBSCRIPTIONID"] | Out-Null
-                        Stop-AzVM -Name $vmName -ResourceGroupName $envContext["AZ_RG"] -Force
+                        Set-AzContext -SubscriptionId $envContext["Az_SubscriptionID"] | Out-Null
+                        Stop-AzVM -Name $vmName -ResourceGroupName $envContext["Az_RG"] -Force
                     }
                 }
             } else {
@@ -151,22 +149,22 @@ function Monitor-And-Scale {
 
 # Prepare environment context
 $envContext = @{
-    "COLLECTIONURL" = $CollectionURL
-    "PROJECT" = $Project
-    "AGENTPOOL" = $AgentPool
+    "CollectionURL" = $CollectionURL
+    "Project" = $Project
+    "AgentPool" = $AgentPool
     "ADO_PAT" = $ADO_PAT
-    "AZ_TENANTID" = $Az_TenantID
-    "AZ_CLIENTID" = $Az_ClientID
-    "AZ_CLIENT_SECRET" = $Az_Client_Secret
+    "Az_TenantID" = $Az_TenantID
+    "Az_ClientID" = $Az_ClientID
+    "Az_Client_Secret" = $Az_Client_Secret
     "Name" = $prefix
 }
 
 if ($prefix -eq "ProAB") {
-    $envContext["AZ_VMS_RGs_Subs"] = $Az_VMs_RGs_Subs_Mapping
+    $envContext["Az_VMs_RGs_Subs"] = $Az_VMs_RGs_Subs_Mapping
 } else {
-    $envContext["AZ_VMS"] = $Az_VMs
-    $envContext["AZ_RG"] = $Az_RG
-    $envContext["AZ_SUBSCRIPTIONID"] = $Az_SubscriptionID
+    $envContext["Az_VMs"] = $Az_VMs
+    $envContext["Az_RG"] = $Az_RG
+    $envContext["Az_SubscriptionID"] = $Az_SubscriptionID
     $envContext["VMList"] = $Az_VMs -split ","
 }
 
