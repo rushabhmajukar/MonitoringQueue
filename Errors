@@ -1,12 +1,12 @@
-Removing service
-Succeeded: Removing service
-Removing agent from the server
-Enter authentication type (press enter for Integrated) >
-Connecting to server ...
-Does not exist. Skipping Removing agent from the server
-Removing .credentials
-Succeeded: Removing .credentials
-Removing .agent
-Succeeded: Removing .agent
+- task: PowerShell@2
+  inputs:
+    targetType: 'inline'
+    script: |
+      [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+      Install-PackageProvider -Name NuGet -Force -Confirm:$false
+      Set-PSRepository PSGallery -InstallationPolicy Trusted
+      Install-Module -Name Az -Force -Scope CurrentUser -AllowClobber
+
+
 
 
