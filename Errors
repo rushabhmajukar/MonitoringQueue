@@ -8,5 +8,16 @@
       Install-Module -Name Az -Force -Scope CurrentUser -AllowClobber
 
 
+Install-PackageProvider : No match was found for the specified search criteria for the provider 'NuGet'. The package
+provider requires 'PackageManagement' and 'Provider' tags. Please check if the specified package has the tags.
+At line:1 char:1
++ Install-PackageProvider -Name NuGet -Force -Confirm:$false
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : InvalidArgument: (Microsoft.Power...PackageProvider:InstallPackageProvider) [Install-Pac
+   kageProvider], Exception
+    + FullyQualifiedErrorId : NoMatchFoundForProvider,Microsoft.PowerShell.PackageManagement.Cmdlets.InstallPackagePro
+   vider
+
+
 
 
