@@ -1,16 +1,12 @@
-At C:\azp\agent\_work\15\s\Merger.ps1:71 char:17
-+         } elseif {
-+                 ~
-Missing '(' after 'elseif' in if statement.
-    + CategoryInfo          : ParserError: (:) [], ParentContainsErrorRecordException
-    + FullyQualifiedErrorId : MissingOpenParenthesisInIfStatement
- 
-##[error]PowerShell exited with code '1'.
-
-The logic shouldn't be coupled to names of agent pools.
-It could take desired number of idle agents as input and maintain that number from its list of machines (passed either as a parameter or received from REST API)
-
-The engine "node" is incompatible with this module. Expected version ">=20.15.0". Got 
-"16.16.0"
+Removing service
+Succeeded: Removing service
+Removing agent from the server
+Enter authentication type (press enter for Integrated) >
+Connecting to server ...
+Does not exist. Skipping Removing agent from the server
+Removing .credentials
+Succeeded: Removing .credentials
+Removing .agent
+Succeeded: Removing .agent
 
 
