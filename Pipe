@@ -1,5 +1,13 @@
 trigger: none
 
+schedules:
+  - cron: "*/10 7-17 * * 1-5"
+    displayName: Triggers every 10 minutes from 7 AM to 5 PM GMT (Monday to Friday)
+    branches:
+      include:
+        - main
+    always: true
+
 pool:
   name: 'abc'
 
