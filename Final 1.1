@@ -17,6 +17,19 @@ param (
 
 Write-Host "`n===== Checking Agent Pool: $AgentPool ====="
 
+# Determine working hours: 07:00–17:00 GMT
+$currentHourGMT = (Get-Date).ToUniversalTime().Hour
+$withinWorkingHours = ($currentHourGMT -ge 7 -and $currentHourGMT -lt 17)
+
+if (-not $withinWorkingHours) {
+    Write-Host "Outside working hours (GMT). Forcing MinAgentsToKeepOnline = 0"
+    $MinAgentsToKeepOnline = 0
+    $MinWindows11Agents = 0
+    $MinWindowsServerAgents = 0
+} else {
+    Write-Host "Within working hours (GMT). Using provided MinAgentsToKeepOnline = $MinAgentsToKeepOnline"
+}
+
 # Azure Login
 $securePassword = ConvertTo-SecureString $Az_Client_Secret -AsPlainText -Force
 $cred = New-Object PSCredential ($Az_ClientID, $securePassword)
@@ -33,7 +46,7 @@ $headers = @{
 $poolUrl = "$CollectionURL/_apis/distributedtask/pools?api-version=6.0"
 $poolResp = Invoke-RestMethod -Uri $poolUrl -Headers $headers -Method Get
 $poolId = ($poolResp.value | Where-Object { $_.name -eq $AgentPool }).id
-Write-Host "Agent Pool ID: $poolId"
+Write-Host "Agent Pool ID '$AgentPool': $poolId"
 
 # Get Queue IDs
 $queueUrl = "$CollectionURL/$Project/_apis/distributedtask/queues?poolIds=$poolId&api-version=6.0-preview"
@@ -45,13 +58,13 @@ $buildUrl = "$CollectionURL/$Project/_apis/build/builds?statusFilter=notStarted,
 $builds = (Invoke-RestMethod -Uri $buildUrl -Headers $headers -Method Get).value
 $buildsUsingPool = $builds | Where-Object { $queueIds -contains $_.queue.id }
 $queuedCount = $buildsUsingPool.Count
-Write-Host "Queued Builds: $queuedCount"
+Write-Host "Queued/Inprogress Builds '$AgentPool': $queuedCount"
 
 # Get Agents
 $agentsUrl = "$CollectionURL/_apis/distributedtask/pools/$poolId/agents?includeAssignedRequest=true&api-version=6.0"
 $agents = (Invoke-RestMethod -Uri $agentsUrl -Headers $headers).value
 
-# Convert JSON Mapping if provided
+# Convert JSON Mapping
 $mappings = @()
 if ($AgentsMappingJson) {
     $mappings = $AgentsMappingJson | ConvertFrom-Json
@@ -67,19 +80,22 @@ if ($queuedCount -gt 0) {
                 Write-Host "Starting VM: $($mapping.VMName)"
                 Set-AzContext -SubscriptionId $mapping.SubscriptionID | Out-Null
                 Start-AzVM -Name $mapping.VMName -ResourceGroupName $mapping.ResourceGroup
+                break  # Start only one agent for queued build
             }
-        } elseif {
+        } else {
             $vmList = $Az_VMs -split ","
             $vmName = $vmList | Where-Object { $_ -like "*$($agent.name)*" }
             if ($vmName) {
                 Write-Host "Starting VM: $vmName"
                 Set-AzContext -SubscriptionId $Az_SubscriptionID | Out-Null
                 Start-AzVM -Name $vmName -ResourceGroupName $Az_RG
+                break
             }
         }
     }
 } else {
     Write-Host "No builds queued. Checking idle agents..."
+
     $idleAgents = $agents | Where-Object { $_.status -eq "online" -and -not $_.assignedRequest }
 
     if ($mappings) {
