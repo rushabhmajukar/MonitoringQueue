@@ -1,3 +1,4 @@
+
 param (
     [string]$CollectionURL,
     [string]$Project,
@@ -17,6 +18,19 @@ param (
 
 Write-Host "`n===== Checking Agent Pool: $AgentPool ====="
 
+# Working hours: 05:00–17:00 GMT
+$currentHourGMT = (Get-Date).ToUniversalTime().Hour
+$withinWorkingHours = ($currentHourGMT -ge 5 -and $currentHourGMT -lt 17)
+
+if (-not $withinWorkingHours) {
+    Write-Host "Outside working hours (GMT). Forcing MinAgentsToKeepOnline = 0"
+    $MinAgentsToKeepOnline = 0
+    $MinWindows11Agents = 0
+    $MinWindowsServerAgents = 0
+} else {
+    Write-Host "Within working hours (GMT). Using provided MinAgentsToKeepOnline = $MinAgentsToKeepOnline"
+}
+
 # Azure Login
 $securePassword = ConvertTo-SecureString $Az_Client_Secret -AsPlainText -Force
 $cred = New-Object PSCredential ($Az_ClientID, $securePassword)
@@ -31,6 +45,7 @@ $headers = @{
 
 # Get Agent Pool ID
 $poolUrl = "$CollectionURL/_apis/distributedtask/pools?api-version=6.0"
+Write-Host "Pool URL: $poolUrl"
 $poolResp = Invoke-RestMethod -Uri $poolUrl -Headers $headers -Method Get
 $poolId = ($poolResp.value | Where-Object { $_.name -eq $AgentPool }).id
 Write-Host "Agent Pool ID '$AgentPool': $poolId"
@@ -67,6 +82,7 @@ if ($queuedCount -gt 0) {
                 Write-Host "Starting VM: $($mapping.VMName)"
                 Set-AzContext -SubscriptionId $mapping.SubscriptionID | Out-Null
                 Start-AzVM -Name $mapping.VMName -ResourceGroupName $mapping.ResourceGroup
+                break  # Start only one agent for queued build
             }
         } else {
             $vmList = $Az_VMs -split ","
@@ -75,11 +91,13 @@ if ($queuedCount -gt 0) {
                 Write-Host "Starting VM: $vmName"
                 Set-AzContext -SubscriptionId $Az_SubscriptionID | Out-Null
                 Start-AzVM -Name $vmName -ResourceGroupName $Az_RG
+                break
             }
         }
     }
 } else {
     Write-Host "No builds queued. Checking idle agents..."
+
     $idleAgents = $agents | Where-Object { $_.status -eq "online" -and -not $_.assignedRequest }
 
     if ($mappings) {
@@ -129,3 +147,4 @@ if ($queuedCount -gt 0) {
 }
 
 Disconnect-AzAccount | Out-Null
+
