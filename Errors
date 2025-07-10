@@ -1,25 +1,11 @@
-https://vstsagentpackage.azureedge.net/agent/2.181.2/vsts-agent-win-x64-2.181.2.zip
-
-- task: PowerShell@2
-  inputs:
-    targetType: 'inline'
-    script: |
-      [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-      Install-PackageProvider -Name NuGet -Force -Confirm:$false
-      Set-PSRepository PSGallery -InstallationPolicy Trusted
-      Install-Module -Name Az -Force -Scope CurrentUser -AllowClobber
-
-
-Install-PackageProvider : No match was found for the specified search criteria for the provider 'NuGet'. The package
-provider requires 'PackageManagement' and 'Provider' tags. Please check if the specified package has the tags.
-At line:1 char:1
-+ Install-PackageProvider -Name NuGet -Force -Confirm:$false
-+ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    + CategoryInfo          : InvalidArgument: (Microsoft.Power...PackageProvider:InstallPackageProvider) [Install-Pac
-   kageProvider], Exception
-    + FullyQualifiedErrorId : NoMatchFoundForProvider,Microsoft.PowerShell.PackageManagement.Cmdlets.InstallPackagePro
-   vider
-
-
-
-
+Agent Pool ID 'PROFLS': 27
+Invoke-RestMethod : {"$id":"1","innerException":null,"message":"The guid specified for parameter ProjectId must not be 
+Guid.Empty.\r\nParameter name: ProjectId","typeName":"System.ArgumentException, 
+mscorlib","typeKey":"ArgumentException","errorCode":0,"eventId":0}
+At C:\agent\_work\1\s\NewMerger.ps1:52 char:12
++ $queues = (Invoke-RestMethod -Uri $queueUrl -Headers $headers -Method ...
++            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : InvalidOperation: (System.Net.HttpWebRequest:HttpWebRequest) [Invoke-RestMethod], WebExc 
+   eption
+    + FullyQualifiedErrorId : WebCmdletWebResponseException,Microsoft.PowerShell.Commands.InvokeRestMethodCommand
+##[error]PowerShell exited with code '1'.
