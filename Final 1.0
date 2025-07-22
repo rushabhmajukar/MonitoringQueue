@@ -47,41 +47,56 @@ $poolUrl = "$CollectionURL/_apis/distributedtask/pools?api-version=6.0"
 Write-Host "Pool URL: $poolUrl"
 $poolResp = Invoke-RestMethod -Uri $poolUrl -Headers $headers -Method Get
 $poolId = ($poolResp.value | Where-Object { $_.name -eq $AgentPool }).id
-if (-not $poolId) {
-    Write-Warning "Agent pool '$AgentPool' not found. Exiting."
-    Disconnect-AzAccount | Out-Null
-    return
-}
 Write-Host "Agent Pool ID '$AgentPool': $poolId"
 
-# Get Queue IDs that map to this pool (project-scoped)
+# Get Queue IDs
 $queueUrl = "$CollectionURL/$Project/_apis/distributedtask/queues?poolIds=$poolId&api-version=6.0-preview"
 $queues = (Invoke-RestMethod -Uri $queueUrl -Headers $headers -Method Get).value
 $queueIds = $queues.id
 
-# ---------------------------------------------------------------------------
-# Build discovery (statusFilter=notStarted,inProgress) + *actual* pool mapping
-# ---------------------------------------------------------------------------
-$buildUrl = "$CollectionURL/$Project/_apis/build/builds?statusFilter=notStarted,inProgress&api-version=6.0"
-$builds = (Invoke-RestMethod -Uri $buildUrl -Headers $headers -Method Get).value
-
-# Cache for queueId->poolName lookup
+# Cache for queueId->poolName lookups
 $queueCache = @{}
 function Get-PoolNameFromQueueId {
-    param([int]$qid)
+    param([AllowNull()]$qid)
+
+    if ($null -eq $qid -or $qid -eq '') { return $null }
+    try { $qid = [int]$qid } catch { return $null }
+    if ($qid -le 0) { return $null }
+
     if ($queueCache.ContainsKey($qid)) { return $queueCache[$qid] }
-    $qUri = "$CollectionURL/$Project/_apis/distributedtask/queues/$qid?api-version=6.0-preview"
-    $q    = Invoke-RestMethod -Uri $qUri -Headers $headers -Method Get -ErrorAction SilentlyContinue
-    $pn   = $null
-    if ($q -and $q.pool -and $q.pool.name) { $pn = $q.pool.name }
+
+    $pn = $null
+    $qUris = @(
+        "$CollectionURL/$Project/_apis/distributedtask/queues/$qid?api-version=6.0-preview",
+        "$CollectionURL/$Project/_apis/distributedtask/queues/$qid?api-version=6.0",
+        "$CollectionURL/_apis/distributedtask/queues/$qid?api-version=6.0-preview",
+        "$CollectionURL/_apis/distributedtask/queues/$qid?api-version=6.0"
+    )
+
+    foreach ($qUri in $qUris) {
+        try {
+            $q = Invoke-RestMethod -Uri $qUri -Headers $headers -Method Get -ErrorAction Stop
+            if ($q -and $q.pool -and $q.pool.name) {
+                $pn = $q.pool.name
+                break
+            }
+        } catch {
+            Write-Verbose "Queue lookup failed ($qUri): $_"
+        }
+    }
+
     $queueCache[$qid] = $pn
     return $pn
 }
 
+# Get active builds
+$buildUrl = "$CollectionURL/$Project/_apis/build/builds?statusFilter=notStarted,inProgress&api-version=6.0"
+$builds = (Invoke-RestMethod -Uri $buildUrl -Headers $headers -Method Get).value
+
+# Filter builds by pool
 $buildsUsingPool = @()
 
 foreach ($b in $builds) {
-    # notStarted -> only queue known; include if queue maps to this pool
     if ($b.status -eq 'notStarted') {
         if ($queueIds -contains $b.queue.id) {
             $buildsUsingPool += $b
@@ -89,7 +104,6 @@ foreach ($b in $builds) {
         continue
     }
 
-    # inProgress -> inspect timeline for actual job pools
     $timelineUrl = "$CollectionURL/$Project/_apis/build/builds/$($b.id)/timeline?api-version=6.0"
     try {
         $timeline = Invoke-RestMethod -Uri $timelineUrl -Headers $headers -Method Get -ErrorAction Stop
@@ -99,15 +113,14 @@ foreach ($b in $builds) {
     }
 
     $jobRecords = $timeline.records | Where-Object { $_.type -eq 'Job' }
-
     foreach ($jr in $jobRecords) {
         $jrPoolName = $null
         if ($jr.PSObject.Properties.Name -contains 'agentPoolName' -and $jr.agentPoolName) {
             $jrPoolName = $jr.agentPoolName
-        } elseif ($jr.PSObject.Properties.Name -contains 'queueId' -and $jr.queueId) {
+        } elseif ($jr.PSObject.Properties.Name -contains 'queueId' -and $null -ne $jr.queueId -and $jr.queueId -ne '') {
             $jrPoolName = Get-PoolNameFromQueueId -qid $jr.queueId
         }
-        if ($jrPoolName -and ($jrPoolName -eq $AgentPool)) {
+        if ($jrPoolName -and $jrPoolName -eq $AgentPool) {
             $buildsUsingPool += $b
             break
         }
@@ -117,32 +130,7 @@ foreach ($b in $builds) {
 $queuedCount = $buildsUsingPool.Count
 Write-Host "Queued/InProgress builds actually targeting '$AgentPool': $queuedCount"
 
-# Uncomment for debug table (queue vs job pools)
-<# 
-$debugRows = foreach ($b in $builds) {
-    $timelineUrl = "$CollectionURL/$Project/_apis/build/builds/$($b.id)/timeline?api-version=6.0"
-    $timeline = Invoke-RestMethod -Uri $timelineUrl -Headers $headers -Method Get -ErrorAction SilentlyContinue
-    $jobPools = @()
-    if ($timeline) {
-        $jobPools = ($timeline.records | Where-Object {$_.type -eq 'Job'} | ForEach-Object {
-            if ($_.agentPoolName) { $_.agentPoolName }
-            elseif ($_.queueId) { Get-PoolNameFromQueueId -qid $_.queueId }
-        } | Sort-Object -Unique)
-    }
-    [pscustomobject]@{
-        BuildId     = $b.id
-        BuildNumber = $b.buildNumber
-        Status      = $b.status
-        QueuePool   = $b.queue.pool.name
-        JobPools    = ($jobPools -join ',')
-    }
-}
-$debugRows | Format-Table -AutoSize
-#>
-
-# ---------------------------------------------------------------------------
-# Agent data for this pool
-# ---------------------------------------------------------------------------
+# Get Agents
 $agentsUrl = "$CollectionURL/_apis/distributedtask/pools/$poolId/agents?includeAssignedRequest=true&api-version=6.0"
 $agents = (Invoke-RestMethod -Uri $agentsUrl -Headers $headers).value
 
@@ -152,9 +140,7 @@ if ($AgentsMappingJson) {
     $mappings = $AgentsMappingJson | ConvertFrom-Json
 }
 
-# ---------------------------------------------------------------------------
-# Scale logic: start if >=1 build targeting this pool; else consider stop
-# ---------------------------------------------------------------------------
+# Start VMs for offline agents if builds are queued
 if ($queuedCount -gt 0) {
     $offlineAgents = $agents | Where-Object { $_.status -eq "offline" }
     foreach ($agent in $offlineAgents) {
@@ -164,7 +150,7 @@ if ($queuedCount -gt 0) {
                 Write-Host "Starting VM: $($mapping.VMName)"
                 Set-AzContext -SubscriptionId $mapping.SubscriptionID | Out-Null
                 Start-AzVM -Name $mapping.VMName -ResourceGroupName $mapping.ResourceGroup
-                break  # start only one
+                break  # Start only one agent for queued build
             }
         } else {
             $vmList = $Az_VMs -split ","
@@ -177,9 +163,8 @@ if ($queuedCount -gt 0) {
             }
         }
     }
-}
-else {
-    Write-Host "No builds targeting '$AgentPool'. Checking idle agents..."
+} else {
+    Write-Host "No builds queued. Checking idle agents..."
 
     $idleAgents = $agents | Where-Object { $_.status -eq "online" -and -not $_.assignedRequest }
 
@@ -197,12 +182,12 @@ else {
             }
         }
 
-        $windows11Idle   = $idleMapped | Where-Object { $_.OSType -eq "Windows11" }
+        $windows11Idle = $idleMapped | Where-Object { $_.OSType -eq "Windows11" }
         $windowsServerIdle = $idleMapped | Where-Object { $_.OSType -eq "WindowsServer2022" }
 
         $agentsToStop = @()
         if ($windows11Idle.Count -gt $MinWindows11Agents) {
-            $agentsToStop += $windows11Idle   | Select-Object -Skip $MinWindows11Agents
+            $agentsToStop += $windows11Idle | Select-Object -Skip $MinWindows11Agents
         }
         if ($windowsServerIdle.Count -gt $MinWindowsServerAgents) {
             $agentsToStop += $windowsServerIdle | Select-Object -Skip $MinWindowsServerAgents
@@ -213,8 +198,7 @@ else {
             Set-AzContext -SubscriptionId $entry.SubscriptionID | Out-Null
             Stop-AzVM -Name $entry.VMName -ResourceGroupName $entry.ResourceGroup -Force
         }
-    }
-    elseif ($idleAgents.Count -gt $MinAgentsToKeepOnline) {
+    } elseif ($idleAgents.Count -gt $MinAgentsToKeepOnline) {
         $agentsToStop = $idleAgents | Select-Object -Skip $MinAgentsToKeepOnline
         foreach ($agent in $agentsToStop) {
             $vmList = $Az_VMs -split ","
@@ -225,8 +209,7 @@ else {
                 Stop-AzVM -Name $vmName -ResourceGroupName $Az_RG -Force
             }
         }
-    }
-    else {
+    } else {
         Write-Host "Idle agents within desired limits. No action taken."
     }
 }
