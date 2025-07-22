@@ -24,7 +24,7 @@
       "log": {
         "id": 6,
         "type": "Container",
-        "url": "http://vwmazbldtfs.fisdev.local:8080/tfs/Prophet/927ba717-ba64-40bd-b89f-a8ccace730d3/_apis/build/builds/87630/logs/6"
+        "url": "http://vwmazbldtfs:8080/tfs/Prophet/927ba717-ba64-40bd-b89f-a8ccace730d3/_apis/build/builds/87630/logs/6"
       },
       "task": {
         "id": "e213ff0f-5d5c-4791-802d-52ea3e7be1f1",
@@ -140,7 +140,7 @@
       "log": {
         "id": 4,
         "type": "Container",
-        "url": "http://vwmazbldtfs.fisdev.local:8080/tfs/Prophet/927ba717-ba64-40bd-b89f-a8ccace730d3/_apis/build/builds/87630/logs/4"
+        "url": "http://vwmazbldtfs:8080/tfs/Prophet/927ba717-ba64-40bd-b89f-a8ccace730d3/_apis/build/builds/87630/logs/4"
       },
       "task": null,
       "attempt": 1,
@@ -222,7 +222,7 @@
       "log": {
         "id": 3,
         "type": "Container",
-        "url": "http://vwmazbldtfs.fisdev.local:8080/tfs/Prophet/927ba717-ba64-40bd-b89f-a8ccace730d3/_apis/build/builds/87630/logs/3"
+        "url": "http://vwmazbldtfs:8080/tfs/Prophet/927ba717-ba64-40bd-b89f-a8ccace730d3/_apis/build/builds/87630/logs/3"
       },
       "task": null,
       "attempt": 1,
@@ -252,7 +252,7 @@
       "log": {
         "id": 5,
         "type": "Container",
-        "url": "http://vwmazbldtfs.fisdev.local:8080/tfs/Prophet/927ba717-ba64-40bd-b89f-a8ccace730d3/_apis/build/builds/87630/logs/5"
+        "url": "http://vwmazbldtfs:8080/tfs/Prophet/927ba717-ba64-40bd-b89f-a8ccace730d3/_apis/build/builds/87630/logs/5"
       },
       "task": null,
       "attempt": 1,
@@ -263,5 +263,5 @@
   "lastChangedOn": "2025-07-22T08:09:49.8Z",
   "id": "c835f5c1-00cf-41f0-8825-234140865ba8",
   "changeId": 12,
-  "url": "http://vwmazbldtfs.fisdev.local:8080/tfs/Prophet/927ba717-ba64-40bd-b89f-a8ccace730d3/_apis/build/builds/87630/Timeline/c835f5c1-00cf-41f0-8825-234140865ba8"
+  "url": "http://vwmazbldtfs:8080/tfs/Prophet/927ba717-ba64-40bd-b89f-a8ccace730d3/_apis/build/builds/87630/Timeline/c835f5c1-00cf-41f0-8825-234140865ba8"
 }
