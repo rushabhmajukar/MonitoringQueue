@@ -1,5 +1,8 @@
 file /usr/lib/gcc/x86_64-redhat-linux/11/32/libatomic.so
 
+[root@vlawsprophbl06 lib]# file /usr/lib/gcc/x86_64-redhat-linux/11/32/libatomic                                                                                                                                                             .so
+/usr/lib/gcc/x86_64-redhat-linux/11/32/libatomic.so: ASCII text
+
 
 ln -s /usr/lib/gcc/x86_64-redhat-linux/11/32/libatomic.so /usr/lib/libatomic.so
 ln -s /usr/lib/gcc/x86_64-redhat-linux/11/32/libatomic.so /usr/lib/libatomic.so.1
