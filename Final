@@ -37,3 +37,8 @@
 /usr/Jenkins/workspace/BuildTools/vcpkg/versions/l-/libatomic-ops.json
 [root@vlawsp1 ~]# ld -verbose | grep SEARCH_DIR
 SEARCH_DIR("=/usr/x86_64-redhat-linux/lib64"); SEARCH_DIR("=/usr/lib64"); SEARCH_DIR("=/usr/local/("=/usr/lib");
+
+
+ln -s /usr/lib/gcc/x86_64-redhat-linux/11/32/libatomic.so /usr/lib/libatomic.so
+ln -s /usr/lib/gcc/x86_64-redhat-linux/11/32/libatomic.so /usr/lib/libatomic.so.1
+ln -s /usr/lib/gcc/x86_64-redhat-linux/11/32/libatomic.so /usr/lib/libatomic.so.1.2.0
