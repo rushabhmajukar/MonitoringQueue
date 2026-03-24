@@ -1,42 +1,4 @@
-[root@vlawsp1] ~]# find / -name "libatomic*" 2>/dev/null
-/opt/gcc-src/gcc-15.2.0/libatomic
-/opt/gcc-src/gcc-15.2.0/libatomic/libatomic_i.h
-/opt/gcc-src/gcc-15.2.0/libatomic/testsuite/lib/libatomic-dg.exp
-/opt/gcc-src/gcc-15.2.0/libatomic/testsuite/lib/libatomic.exp
-/opt/gcc-src/gcc-15.2.0/libatomic/testsuite/libatomic-site-extra.exp.in
-/opt/gcc-src/gcc-15.2.0/libatomic/testsuite/libatomic.c
-/opt/gcc-src/gcc-15.2.0/libatomic/libatomic.map
-/opt/gcc-15/lib64/libatomic.so.1.2.0
-/opt/gcc-15/lib64/libatomic.so.1
-/opt/gcc-15/lib64/libatomic.so
-/opt/gcc-15/lib64/libatomic.la
-/opt/gcc-15/lib64/libatomic.a
-/root/gcc-src/gcc-15.2.0/libatomic
-/root/gcc-src/gcc-15.2.0/libatomic/libatomic_i.h
-/root/gcc-src/gcc-15.2.0/libatomic/testsuite/lib/libatomic-dg.exp
-/root/gcc-src/gcc-15.2.0/libatomic/testsuite/lib/libatomic.exp
-/root/gcc-src/gcc-15.2.0/libatomic/testsuite/libatomic-site-extra.exp.in
-/root/gcc-src/gcc-15.2.0/libatomic/testsuite/libatomic.c
-/root/gcc-src/gcc-15.2.0/libatomic/libatomic.map
-/root/gcc-build/x86_64-pc-linux-gnu/libatomic
-/root/gcc-build/x86_64-pc-linux-gnu/libatomic/testsuite/libatomic-site-extra.exp
-/root/gcc-build/x86_64-pc-linux-gnu/libatomic/.libs/libatomic_convenience.a
-/root/gcc-build/x86_64-pc-linux-gnu/libatomic/.libs/libatomic_convenience.la
-/root/gcc-build/x86_64-pc-linux-gnu/libatomic/.libs/libatomic.so.1.2.0
-/root/gcc-build/x86_64-pc-linux-gnu/libatomic/.libs/libatomic.so.1
-/root/gcc-build/x86_64-pc-linux-gnu/libatomic/.libs/libatomic.so
-/root/gcc-build/x86_64-pc-linux-gnu/libatomic/.libs/libatomic.a
-/root/gcc-build/x86_64-pc-linux-gnu/libatomic/.libs/libatomic.lai
-/root/gcc-build/x86_64-pc-linux-gnu/libatomic/.libs/libatomic.la
-/root/gcc-build/x86_64-pc-linux-gnu/libatomic/libatomic.la
-/root/gcc-build/x86_64-pc-linux-gnu/libatomic/libatomic_convenience.la
-/usr/lib/gcc/x86_64-redhat-linux/11/32/libatomic.a
-/usr/lib/gcc/x86_64-redhat-linux/11/32/libatomic.so
-/usr/lib/gcc/x86_64-redhat-linux/11/libatomic.so
-/usr/Jenkins/workspace/BuildTools/vcpkg/ports/libatomic-ops
-/usr/Jenkins/workspace/BuildTools/vcpkg/versions/l-/libatomic-ops.json
-[root@vlawsp1 ~]# ld -verbose | grep SEARCH_DIR
-SEARCH_DIR("=/usr/x86_64-redhat-linux/lib64"); SEARCH_DIR("=/usr/lib64"); SEARCH_DIR("=/usr/local/("=/usr/lib");
+file /usr/lib/gcc/x86_64-redhat-linux/11/32/libatomic.so
 
 
 ln -s /usr/lib/gcc/x86_64-redhat-linux/11/32/libatomic.so /usr/lib/libatomic.so
