@@ -1,150 +1,39 @@
-
-param (
-    [string]$CollectionURL,
-    [string]$Project,
-    [string]$AgentPool,
-    [string]$ADO_PAT,
-    [string]$Az_TenantID,
-    [string]$Az_ClientID,
-    [string]$Az_Client_Secret,
-    [string]$Az_SubscriptionID,
-    [string]$Az_VMs,
-    [string]$Az_RG,
-    [string]$AgentsMappingJson = "",
-    [int]$MinWindows11Agents,
-    [int]$MinWindowsServerAgents,
-    [int]$MinAgentsToKeepOnline = 1
-)
-
-Write-Host "`n===== Checking Agent Pool: $AgentPool ====="
-
-# Working hours: 05:00–17:00 GMT
-$currentHourGMT = (Get-Date).ToUniversalTime().Hour
-$withinWorkingHours = ($currentHourGMT -ge 5 -and $currentHourGMT -lt 17)
-
-if (-not $withinWorkingHours) {
-    Write-Host "Outside working hours (GMT). Forcing MinAgentsToKeepOnline = 0"
-    $MinAgentsToKeepOnline = 0
-    $MinWindows11Agents = 0
-    $MinWindowsServerAgents = 0
-} else {
-    Write-Host "Within working hours (GMT). Using provided MinAgentsToKeepOnline = $MinAgentsToKeepOnline"
-}
-
-# Azure Login
-$securePassword = ConvertTo-SecureString $Az_Client_Secret -AsPlainText -Force
-$cred = New-Object PSCredential ($Az_ClientID, $securePassword)
-Connect-AzAccount -ServicePrincipal -TenantId $Az_TenantID -Credential $cred | Out-Null
-
-# Azure DevOps API Auth
-$base64AuthInfo = [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes(":" + $ADO_PAT))
-$headers = @{
-    Authorization = "Basic $base64AuthInfo"
-    "Content-Type" = "application/json"
-}
-
-# Get Agent Pool ID
-$poolUrl = "$CollectionURL/_apis/distributedtask/pools?api-version=6.0"
-Write-Host "Pool URL: $poolUrl"
-$poolResp = Invoke-RestMethod -Uri $poolUrl -Headers $headers -Method Get
-$poolId = ($poolResp.value | Where-Object { $_.name -eq $AgentPool }).id
-Write-Host "Agent Pool ID '$AgentPool': $poolId"
-
-# Get Queue IDs
-$queueUrl = "$CollectionURL/$Project/_apis/distributedtask/queues?poolIds=$poolId&api-version=6.0-preview"
-$queues = (Invoke-RestMethod -Uri $queueUrl -Headers $headers -Method Get).value
-$queueIds = $queues.id
-
-# Get Builds
-$buildUrl = "$CollectionURL/$Project/_apis/build/builds?statusFilter=notStarted,inProgress&api-version=6.0"
-$builds = (Invoke-RestMethod -Uri $buildUrl -Headers $headers -Method Get).value
-$buildsUsingPool = $builds | Where-Object { $queueIds -contains $_.queue.id }
-$queuedCount = $buildsUsingPool.Count
-Write-Host "Queued/Inprogress Builds '$AgentPool': $queuedCount"
-
-# Get Agents
-$agentsUrl = "$CollectionURL/_apis/distributedtask/pools/$poolId/agents?includeAssignedRequest=true&api-version=6.0"
-$agents = (Invoke-RestMethod -Uri $agentsUrl -Headers $headers).value
-
-# Convert JSON Mapping
-$mappings = @()
-if ($AgentsMappingJson) {
-    $mappings = $AgentsMappingJson | ConvertFrom-Json
-}
-
-# Start VMs for offline agents if builds are queued
-if ($queuedCount -gt 0) {
-    $offlineAgents = $agents | Where-Object { $_.status -eq "offline" }
-    foreach ($agent in $offlineAgents) {
-        if ($mappings) {
-            $mapping = $mappings | Where-Object { $_.VMName -eq $agent.name }
-            if ($mapping) {
-                Write-Host "Starting VM: $($mapping.VMName)"
-                Set-AzContext -SubscriptionId $mapping.SubscriptionID | Out-Null
-                Start-AzVM -Name $mapping.VMName -ResourceGroupName $mapping.ResourceGroup
-                break  # Start only one agent for queued build
-            }
-        } else {
-            $vmList = $Az_VMs -split ","
-            $vmName = $vmList | Where-Object { $_ -like "*$($agent.name)*" }
-            if ($vmName) {
-                Write-Host "Starting VM: $vmName"
-                Set-AzContext -SubscriptionId $Az_SubscriptionID | Out-Null
-                Start-AzVM -Name $vmName -ResourceGroupName $Az_RG
-                break
-            }
-        }
-    }
-} else {
-    Write-Host "No builds queued. Checking idle agents..."
-
-    $idleAgents = $agents | Where-Object { $_.status -eq "online" -and -not $_.assignedRequest }
-
-    if ($mappings) {
-        $idleMapped = foreach ($agent in $idleAgents) {
-            $map = $mappings | Where-Object { $_.VMName -eq $agent.name }
-            if ($map) {
-                [PSCustomObject]@{
-                    Agent = $agent
-                    VMName = $map.VMName
-                    ResourceGroup = $map.ResourceGroup
-                    SubscriptionID = $map.SubscriptionID
-                    OSType = $map.OSType
-                }
-            }
-        }
-
-        $windows11Idle = $idleMapped | Where-Object { $_.OSType -eq "Windows11" }
-        $windowsServerIdle = $idleMapped | Where-Object { $_.OSType -eq "WindowsServer2022" }
-
-        $agentsToStop = @()
-        if ($windows11Idle.Count -gt $MinWindows11Agents) {
-            $agentsToStop += $windows11Idle | Select-Object -Skip $MinWindows11Agents
-        }
-        if ($windowsServerIdle.Count -gt $MinWindowsServerAgents) {
-            $agentsToStop += $windowsServerIdle | Select-Object -Skip $MinWindowsServerAgents
-        }
-
-        foreach ($entry in $agentsToStop) {
-            Write-Host "Stopping VM: $($entry.VMName)"
-            Set-AzContext -SubscriptionId $entry.SubscriptionID | Out-Null
-            Stop-AzVM -Name $entry.VMName -ResourceGroupName $entry.ResourceGroup -Force
-        }
-    } elseif ($idleAgents.Count -gt $MinAgentsToKeepOnline) {
-        $agentsToStop = $idleAgents | Select-Object -Skip $MinAgentsToKeepOnline
-        foreach ($agent in $agentsToStop) {
-            $vmList = $Az_VMs -split ","
-            $vmName = $vmList | Where-Object { $_ -like "*$($agent.name)*" }
-            if ($vmName) {
-                Write-Host "Stopping VM: $vmName"
-                Set-AzContext -SubscriptionId $Az_SubscriptionID | Out-Null
-                Stop-AzVM -Name $vmName -ResourceGroupName $Az_RG -Force
-            }
-        }
-    } else {
-        Write-Host "Idle agents within desired limits. No action taken."
-    }
-}
-
-Disconnect-AzAccount | Out-Null
-
+[root@vlawsp1] ~]# find / -name "libatomic*" 2>/dev/null
+/opt/gcc-src/gcc-15.2.0/libatomic
+/opt/gcc-src/gcc-15.2.0/libatomic/libatomic_i.h
+/opt/gcc-src/gcc-15.2.0/libatomic/testsuite/lib/libatomic-dg.exp
+/opt/gcc-src/gcc-15.2.0/libatomic/testsuite/lib/libatomic.exp
+/opt/gcc-src/gcc-15.2.0/libatomic/testsuite/libatomic-site-extra.exp.in
+/opt/gcc-src/gcc-15.2.0/libatomic/testsuite/libatomic.c
+/opt/gcc-src/gcc-15.2.0/libatomic/libatomic.map
+/opt/gcc-15/lib64/libatomic.so.1.2.0
+/opt/gcc-15/lib64/libatomic.so.1
+/opt/gcc-15/lib64/libatomic.so
+/opt/gcc-15/lib64/libatomic.la
+/opt/gcc-15/lib64/libatomic.a
+/root/gcc-src/gcc-15.2.0/libatomic
+/root/gcc-src/gcc-15.2.0/libatomic/libatomic_i.h
+/root/gcc-src/gcc-15.2.0/libatomic/testsuite/lib/libatomic-dg.exp
+/root/gcc-src/gcc-15.2.0/libatomic/testsuite/lib/libatomic.exp
+/root/gcc-src/gcc-15.2.0/libatomic/testsuite/libatomic-site-extra.exp.in
+/root/gcc-src/gcc-15.2.0/libatomic/testsuite/libatomic.c
+/root/gcc-src/gcc-15.2.0/libatomic/libatomic.map
+/root/gcc-build/x86_64-pc-linux-gnu/libatomic
+/root/gcc-build/x86_64-pc-linux-gnu/libatomic/testsuite/libatomic-site-extra.exp
+/root/gcc-build/x86_64-pc-linux-gnu/libatomic/.libs/libatomic_convenience.a
+/root/gcc-build/x86_64-pc-linux-gnu/libatomic/.libs/libatomic_convenience.la
+/root/gcc-build/x86_64-pc-linux-gnu/libatomic/.libs/libatomic.so.1.2.0
+/root/gcc-build/x86_64-pc-linux-gnu/libatomic/.libs/libatomic.so.1
+/root/gcc-build/x86_64-pc-linux-gnu/libatomic/.libs/libatomic.so
+/root/gcc-build/x86_64-pc-linux-gnu/libatomic/.libs/libatomic.a
+/root/gcc-build/x86_64-pc-linux-gnu/libatomic/.libs/libatomic.lai
+/root/gcc-build/x86_64-pc-linux-gnu/libatomic/.libs/libatomic.la
+/root/gcc-build/x86_64-pc-linux-gnu/libatomic/libatomic.la
+/root/gcc-build/x86_64-pc-linux-gnu/libatomic/libatomic_convenience.la
+/usr/lib/gcc/x86_64-redhat-linux/11/32/libatomic.a
+/usr/lib/gcc/x86_64-redhat-linux/11/32/libatomic.so
+/usr/lib/gcc/x86_64-redhat-linux/11/libatomic.so
+/usr/Jenkins/workspace/BuildTools/vcpkg/ports/libatomic-ops
+/usr/Jenkins/workspace/BuildTools/vcpkg/versions/l-/libatomic-ops.json
+[root@vlawsp1 ~]# ld -verbose | grep SEARCH_DIR
+SEARCH_DIR("=/usr/x86_64-redhat-linux/lib64"); SEARCH_DIR("=/usr/lib64"); SEARCH_DIR("=/usr/local/("=/usr/lib");
