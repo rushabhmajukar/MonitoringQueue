@@ -1,0 +1,88 @@
+[root@vlawsprophbl01 ~]# rpm -qa | grep "i686\|i386\|32" | sort
+boost-filesystem-1.75.0-13.el9_7.i686
+boost-regex-1.75.0-13.el9_7.i686
+boost-system-1.75.0-13.el9_7.i686
+boost-thread-1.75.0-13.el9_7.i686
+CentrifyDC-5.9.1-329.x86_64
+CentrifyDC-curl-5.9.1-329.x86_64
+CentrifyDC-openldap-5.9.1-329.x86_64
+CentrifyDC-openssl-5.9.1-329.x86_64
+coreutils-8.32-39.el9.x86_64
+coreutils-common-8.32-39.el9.x86_64
+glibc-2.34-231.el9_7.10.i686
+glibc-devel-2.34-231.el9_7.10.i686
+glibc-gconv-extra-2.34-231.el9_7.10.i686
+libatomic-11.5.0-11.el9.i686
+libgcc-11.5.0-11.el9.i686
+libicu-67.1-10.el9_6.i686
+libstdc++-11.5.0-11.el9.i686
+libxcrypt-4.4.18-3.el9.i686
+libxcrypt-devel-4.4.18-3.el9.i686
+lsscsi-0.32-6.el9.x86_64
+lvm2-2.03.32-2.el9_7.1.x86_64
+lvm2-dbusd-2.03.32-2.el9_7.1.noarch
+lvm2-libs-2.03.32-2.el9_7.1.x86_64
+lvm2-lockd-2.03.32-2.el9_7.1.x86_64
+lz4-libs-1.9.3-5.el9.i686
+mpg123-libs-1.32.9-1.el9_5.x86_64
+ncurses-libs-6.2-12.20210508.el9.i686
+openssl-devel-3.5.1-7.el9_7.i686
+openssl-libs-3.5.1-7.el9_7.i686
+perl-5.32.1-481.1.el9_6.x86_64
+perl-devel-5.32.1-481.1.el9_6.x86_64
+perl-doc-5.32.1-481.1.el9_6.noarch
+perl-interpreter-5.32.1-481.1.el9_6.x86_64
+perl-libnetcfg-5.32.1-481.1.el9_6.noarch
+perl-libs-5.32.1-481.1.el9_6.x86_64
+perl-macros-5.32.1-481.1.el9_6.noarch
+perl-meta-notation-5.32.1-481.1.el9_6.noarch
+perl-ph-5.32.1-481.1.el9_6.x86_64
+perl-utils-5.32.1-481.1.el9_6.noarch
+zlib-1.2.11-40.el9.i686
+
+
+
+[root@vlawsprophbl01 ~]# rpm -qa | grep -i atomic
+libatomic-11.5.0-11.el9.x86_64
+libatomic-11.5.0-11.el9.i686
+
+
+[root@vlawsprophbl01 ~]# ld --verbose | grep SEARCH_DIR
+SEARCH_DIR("=/usr/x86_64-redhat-linux/lib64"); SEARCH_DIR("=/usr/lib64"); SEARCH_DIR("=/usr/local/lib64"); SEARCH_DIR("=/lib64"); SEARCH_DIR("=/usr/x86_64-redhat-linux/lib"); SEARCH_DIR("=/usr/local/lib"); SEARCH_DIR("=/lib"); SEARCH_DIR("=/usr/lib");
+
+
+[root@vlawsprophbl01 ~]# ls /usr/lib/
+audit          jvm-private                    libc.so.6                  liblz4.so.1.9.3               libpthread.a         modules
+binfmt.d       kbd                            libdl.a                    libmcheck.a                   libpthread.so.0      modules-load.d
+cmake          kdump                          libdl.so.2                 libmemusage.so                libresolv.so         motd
+cpp            kernel                         libform.so.6               libmenu.so.6                  libresolv.so.2       motd.d
+crt1.o         ld-linux.so.2                  libform.so.6.2             libmenu.so.6.2                librt.a              NetworkManager
+crti.o         libanl.a                       libformw.so.6              libmenuw.so.6                 librt.so.1           os-release
+crtn.o         libanl.so                      libformw.so.6.2            libmenuw.so.6.2               libSegFault.so       ossl-modules
+debug          libanl.so.1                    libg.a                     libm.so                       libssl.so            pam.d
+dracut         libatomic.so.1                 libgcc_s-11-20240719.so.1  libm.so.6                     libssl.so.3          pkgconfig
+eclipse        libatomic.so.1.2.0             libgcc_s.so.1              libncurses.so.6               libssl.so.3.5.1      polkit-1
+engines-3      libboost_filesystem.so.1.75.0  libicudata.so.67           libncurses.so.6.2             libstdc++.so.6       python3.9
+environment.d  libboost_regex.so.1.75.0       libicudata.so.67.1         libncursesw.so.6              libstdc++.so.6.0.29  rcrt1.o
+fipscheck      libboost_system.so.1.75.0      libicui18n.so.67           libncursesw.so.6.2            libthread_db.so      rpm
+firewalld      libboost_thread.so.1.75.0      libicui18n.so.67.1         libnss_centrifydc.so.0        libthread_db.so.1    Scrt1.o
+firmware       libBrokenLocale.so             libicuio.so.67             libnss_centrifydc.so.2        libtic.so.6          security
+fontconfig     libBrokenLocale.so.1           libicuio.so.67.1           libnss_centrify_logonly.so.0  libtic.so.6.2        swidtag
+games          libc_malloc_debug.so.0         libicutest.so.67           libnss_centrify_logonly.so.2  libtinfo.so.6        sysctl.d
+gcc            libc_nonshared.a               libicutest.so.67.1         libnss_compat.so.2            libtinfo.so.6.2      sysimage
+gconv          libcrypto.so                   libicutu.so.67             libnss_dns.so.2               libutil.a            systemd
+gcrt1.o        libcrypto.so.3                 libicutu.so.67.1           libnss_files.so.2             libutil.so.1         sysusers.d
+grcrt1.o       libcrypto.so.3.5.1             libicuuc.so.67             libpanel.so.6                 libz.so.1            tmpfiles.d
+grub           libcrypt.so                    libicuuc.so.67.1           libpanel.so.6.2               libz.so.1.2.11       tuned
+java           libcrypt.so.2                  libkeyfactorpkcs11.so      libpanelw.so.6                locale               udev
+jvm            libcrypt.so.2.0.0              liblz4.so                  libpanelw.so.6.2              Mcrt1.o
+jvm-common     libc.so                        liblz4.so.1                libpcprofile.so               modprobe.d
+
+
+ls /usr
+bin  games  include  java  Jenins  Jenkins  lib  lib64  libexec  local  sbin  share  src  tmp
+
+[root@vlawsprophbl01 ~]#  ls /usr/Jenkins/workspace/BuildTools
+7z                    bit7ziplib_4.0.5  boost-1_82_0  Firebird_3_0_8_Linux     googletest    InternalTools  lz4-1.9.4  Plugins      pugixml-1.13
+aws-sdk-cpp-1_11_490  bit7ziplib_4.0.9  CUDA-12.6.3   Firebird_3_0_8_Linux_64  Installation  linuxtools     packages   Poco-1.12.4  vcpkg
+
