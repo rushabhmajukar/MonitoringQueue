@@ -1,11 +1,25 @@
-# Check what's missing
-diff <(ls /usr/Jenkins/workspace/BuildTools/) \
-     <(ssh linux01 ls /usr/Jenkins/workspace/BuildTools/)
+#!/bin/bash
+# agent_setup.sh - Run on every new Linux agent
 
-# Copy missing directories from Linux01
-scp -r linux01:/usr/Jenkins/workspace/BuildTools/bit7ziplib_4.0.5 \
-    /usr/Jenkins/workspace/BuildTools/
-scp -r linux01:/usr/Jenkins/workspace/BuildTools/CUDA-12.6.3 \
-    /usr/Jenkins/workspace/BuildTools/
-scp -r linux01:/usr/Jenkins/workspace/BuildTools/Firebird_3_0_8_Linux_64 \
-    /usr/Jenkins/workspace/BuildTools/
+# Install all required 32-bit packages
+sudo dnf install -y \
+    libatomic \
+    libatomic.i686 \
+    libgcc.i686 \
+    glibc.i686 \
+    glibc-devel.i686 \
+    lz4-libs.i686 \
+    libstdc++.i686 \
+    openssl-devel.i686 \
+    libxcrypt-devel.i686 \
+    zlib-devel.i686
+
+# Verify critical libraries
+echo "=== Verifying libatomic ==="
+rpm -qa | grep -i atomic
+ls -la /usr/lib/libatomic*
+
+echo "=== Verifying BuildTools ==="
+ls /usr/Jenkins/workspace/BuildTools/
+
+echo "=== Setup Complete ==="
