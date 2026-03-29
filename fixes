@@ -1,0 +1,11 @@
+# Check what's missing
+diff <(ls /usr/Jenkins/workspace/BuildTools/) \
+     <(ssh linux01 ls /usr/Jenkins/workspace/BuildTools/)
+
+# Copy missing directories from Linux01
+scp -r linux01:/usr/Jenkins/workspace/BuildTools/bit7ziplib_4.0.5 \
+    /usr/Jenkins/workspace/BuildTools/
+scp -r linux01:/usr/Jenkins/workspace/BuildTools/CUDA-12.6.3 \
+    /usr/Jenkins/workspace/BuildTools/
+scp -r linux01:/usr/Jenkins/workspace/BuildTools/Firebird_3_0_8_Linux_64 \
+    /usr/Jenkins/workspace/BuildTools/
