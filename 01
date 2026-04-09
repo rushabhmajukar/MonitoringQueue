@@ -16,3 +16,8 @@ dotnet-runtime-deps-8.0.x86_64                       8.0.25-1                   
 dotnet-sdk-8.0.x86_64                                8.0.419-1                        @packages-microsoft-com-prod
 dotnet-targeting-pack-8.0.x86_64                     8.0.25-1                         @packages-microsoft-com-prod
 
+[root@vlawsprophbl06 ~]# dnf list installed | grep dotnet
+dotnet-host.x86_64                                   9.0.14-1                         @packages-microsoft-com-prod
+[root@vlawsprophbl06 ~]# dotnet --version
+Error: [/usr/share/dotnet/host/fxr] does not exist
+Failed to resolve libhostfxr.so [not found]. Error code: 0x80008083
