@@ -21,3 +21,10 @@ dotnet-host.x86_64                                   9.0.14-1                   
 [root@vlawsprophbl06 ~]# dotnet --version
 Error: [/usr/share/dotnet/host/fxr] does not exist
 Failed to resolve libhostfxr.so [not found]. Error code: 0x80008083
+
+dnf install -y \
+  dotnet-host \
+  dotnet-hostfxr-8.0 \
+  dotnet-runtime-8.0 \
+  dotnet-runtime-deps-8.0 \
+  dotnet-sdk-8.0
