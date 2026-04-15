@@ -1,30 +1,60 @@
-[root@vlawsprophbl06 ~]# dotnet --version
-Error: [/usr/lib64/dotnet/host/fxr] does not contain any version-numbered child folders
-[root@vlawsprophbl06 ~]# ^C
-[root@vlawsprophbl06 ~]# which dotnet
-/usr/bin/dotnet
-[root@vlawsprophbl06 ~]# whereis dotnet
-dotnet: /usr/bin/dotnet /usr/lib64/dotnet /etc/dotnet /usr/share/dotnet /usr/share/man/man1/dotnet.1.gz
+schedules:
+- cron: "0 */6 * * *"   # Every 6 hours
+  displayName: Update Epic Bug Impact
+  branches:
+    include:
+    - main
+  always: true
 
+pool:
+  vmImage: 'ubuntu-latest'
 
-[root@vlawsprophbl06 ~]# dnf list installed | grep dotnet
-dotnet-apphost-pack-8.0.x86_64                       8.0.25-1                         @packages-microsoft-com-prod
-dotnet-host.x86_64                                   10.0.3-1.el9_7                   @rhel-9-for-x86_64-appstream-rpms
-dotnet-hostfxr-8.0.x86_64                            8.0.25-1                         @packages-microsoft-com-prod
-dotnet-runtime-8.0.x86_64                            8.0.25-1                         @packages-microsoft-com-prod
-dotnet-runtime-deps-8.0.x86_64                       8.0.25-1                         @packages-microsoft-com-prod
-dotnet-sdk-8.0.x86_64                                8.0.419-1                        @packages-microsoft-com-prod
-dotnet-targeting-pack-8.0.x86_64                     8.0.25-1                         @packages-microsoft-com-prod
+steps:
+- task: PowerShell@2
+  inputs:
+    targetType: 'inline'
+    script: |
+      # Variables
+      $org      = "https://dev.azure.com/YOUR_ORG"
+      $project  = "YOUR_PROJECT"
+      $token    = "$(System.AccessToken)"   # Built-in, no PAT needed
+      $headers  = @{ Authorization = "Bearer $token"
+                     "Content-Type" = "application/json" }
 
-[root@vlawsprophbl06 ~]# dnf list installed | grep dotnet
-dotnet-host.x86_64                                   9.0.14-1                         @packages-microsoft-com-prod
-[root@vlawsprophbl06 ~]# dotnet --version
-Error: [/usr/share/dotnet/host/fxr] does not exist
-Failed to resolve libhostfxr.so [not found]. Error code: 0x80008083
+      # Step 1 — Get all Epics
+      $wiql = @{ query = "SELECT [System.Id] FROM WorkItems 
+                          WHERE [System.WorkItemType] = 'Epic' 
+                          AND [System.TeamProject] = '$project'" } | ConvertTo-Json
 
-dnf install -y \
-  dotnet-host \
-  dotnet-hostfxr-8.0 \
-  dotnet-runtime-8.0 \
-  dotnet-runtime-deps-8.0 \
-  dotnet-sdk-8.0
+      $epics = Invoke-RestMethod `
+        -Uri "$org/$project/_apis/wit/wiql?api-version=7.0" `
+        -Method POST -Headers $headers -Body $wiql
+
+      foreach ($epic in $epics.workItems) {
+          $epicId = $epic.id
+
+          # Step 2 — Get linked Bug count
+          $relations = Invoke-RestMethod `
+            -Uri "$org/$project/_apis/wit/workitems/$($epicId)?`$expand=relations&api-version=7.0" `
+            -Headers $headers
+
+          $bugCount = ($relations.relations | Where-Object {
+              $_.rel -eq "System.LinkTypes.Hierarchy-Forward" -or 
+              $_.rel -eq "System.LinkTypes.Related"
+          }).Count
+
+          # Step 3 — Determine value
+          $changeValue = if ($bugCount -ge 15) { "High" }
+                         elseif ($bugCount -ge 10) { "Medium" }
+                         elseif ($bugCount -ge 5)  { "Low" }
+                         else                       { "Low" }
+
+          # Step 4 — PATCH the Epic
+          $patch = @(@{ op="add"; path="/fields/Custom.Changes"; value=$changeValue }) | ConvertTo-Json
+          Invoke-RestMethod `
+            -Uri "$org/$project/_apis/wit/workitems/$($epicId)?api-version=7.0" `
+            -Method PATCH -Headers $headers -Body $patch `
+            -ContentType "application/json-patch+json"
+
+          Write-Host "Epic $epicId → $changeValue ($bugCount bugs)"
+      }
