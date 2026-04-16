@@ -4,5 +4,5 @@ Linked Risk items: 0
 Computed RAG status: Low
 Patch body: [{"op":"add","path":"/fields/Custom.RAG","value":"Low"},{"op":"replace","path":"/fields/Custom.RAG","value":"Low"}]
 ERROR updating OKR 305186 : {"$id":"1","innerException":null,"message":"VS403691: Update to work item 305186 had two or more updates for field with reference name 'Custom.RAG'. A field cannot be updated more than once in the same update.","typeName":"System.InvalidOperationException, mscorlib","typeKey":"InvalidOperationException","errorCode":0,"eventId":0}
-Patch URI : http://vwmazbldtfs.fisdev.local:8080/tfs/Prophet/Risk_Mgmt/_apis/wit/workitems/305186?api-version=6.1-preview
+Patch URI : http://org.local:8080/tfs/org/proj/_apis/wit/workitems/305186?api-version=6.1-preview
 Patch body: [{"op":"add","path":"/fields/Custom.RAG","value":"Low"},{"op":"replace","path":"/fields/Custom.RAG","value":"Low"}]
