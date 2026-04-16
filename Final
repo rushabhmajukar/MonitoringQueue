@@ -132,12 +132,17 @@ steps:
         $ragValue = Get-RAGStatus $riskCount
         Write-Host "Computed RAG status: $ragValue"
 
-        # ── Step 5: PATCH the RAG field on the OKR ───────────────────────
-        # Send both 'add' and 'replace' to handle null and already-set fields
-        $patchBody = "[" +
-          "{`"op`":`"add`",`"path`":`"/fields/$ragRefName`",`"value`":`"$ragValue`"}," +
-          "{`"op`":`"replace`",`"path`":`"/fields/$ragRefName`",`"value`":`"$ragValue`"}" +
-          "]"
+        # ── Step 5: Determine patch op based on current RAG field value ───
+        $currentRAG = $okrDetails.fields.$ragRefName
+        if ([string]::IsNullOrWhiteSpace($currentRAG)) {
+          $patchOp = "add"
+        } else {
+          $patchOp = "replace"
+        }
+        Write-Host "Current RAG value: '$currentRAG' — using op: '$patchOp'"
+
+        # ── Step 6: PATCH the RAG field on the OKR ───────────────────────
+        $patchBody = "[{`"op`":`"$patchOp`",`"path`":`"/fields/$ragRefName`",`"value`":`"$ragValue`"}]"
 
         Write-Host "Patch body: $patchBody"
 
