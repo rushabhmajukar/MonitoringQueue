@@ -30,22 +30,17 @@ steps:
       # 1–2 linked Risks      → Medium
       # 3+  linked Risks      → High
       function Get-RAGStatus($riskCount) {
-        if ($riskCount -ge 3)    { return "High"   }
+        if ($riskCount -ge 3)     { return "High"   }
         elseif ($riskCount -ge 1) { return "Medium" }
         else                      { return "Low"    }
       }
 
       # ── Step 1: Get all OKR IDs via WIQL ─────────────────────────────────
-      $wiqlObj = @{
-        query = @"
-      SELECT [System.Id]
-      FROM WorkItems
-      WHERE [System.WorkItemType] = 'OKR'
-        AND [System.TeamProject] = '$project'
-"@
-      }
+      $wiqlQuery = "SELECT [System.Id] FROM WorkItems WHERE [System.WorkItemType] = 'OKR' AND [System.TeamProject] = '$project'"
 
-      $wiql = $wiqlObj | ConvertTo-Json -Depth 5
+      $wiqlObj = @{ query = $wiqlQuery }
+      $wiql    = $wiqlObj | ConvertTo-Json -Depth 5
+
       Write-Host "Querying OKRs..."
 
       $okrsResponse = Invoke-RestMethod `
@@ -90,10 +85,8 @@ steps:
           }
 
           foreach ($rel in $linkedRelations) {
-            # Extract the linked work item ID from the relation URL
             $linkedId = $rel.url -replace '.*/(\d+)$', '$1'
 
-            # Fetch the linked work item to check its type
             $linkedUb = [System.UriBuilder]::new("$org/$project/_apis/wit/workitems/$linkedId")
             $linkedUb.Query = "api-version=6.1-preview"
             $linkedUri = $linkedUb.Uri.AbsoluteUri
@@ -116,7 +109,6 @@ steps:
         Write-Host "Computed RAG status: $ragValue"
 
         # ── Step 5: PATCH the RAG field on the OKR ───────────────────────
-        # Replace 'Custom.RAG' below with your field's actual reference name
         $patchBody = @(
           @{
             op    = "add"
