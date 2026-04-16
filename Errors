@@ -1,24 +1,8 @@
-Querying OKRs...
-Found 122 OKR(s).
-----------------------------------------
-OKR ID: 305183
-GET http://org.local:8080/tfs/org/proj/_apis/wit/workitems/305183?$expand=relations&api-version=6.1-preview
+OKR ID: 305186
+GET http://org.local:8080/tfs/org/proj/_apis/wit/workitems/305186?$expand=relations&api-version=6.1-preview
 Linked Risk items: 0
 Computed RAG status: Low
-Invoke-RestMethod : {"$id":"1","innerException":null,"message":"You must pass a valid patch document in the body of 
-the request.","typeName":"Microsoft.VisualStudio.Services.Common.VssPropertyValidationException, 
-Microsoft.VisualStudio.Services.Common","typeKey":"VssPropertyValidationException","errorCode":0,"eventId":3000}
-At C:\agent\_work\_temp\10996c65-9556-4e47-85ef-8c0e752be0f2.ps1:119 char:3
-+   Invoke-RestMethod `
-+   ~~~~~~~~~~~~~~~~~~~
-    + CategoryInfo          : InvalidOperation: (System.Net.HttpWebRequest:HttpWebRequest) [Invoke-RestMethod], WebExc 
-   eption
-    + FullyQualifiedErrorId : WebCmdletWebResponseException,Microsoft.PowerShell.Commands.InvokeRestMethodCommand
-
-			<FIELD name="RAG" refname="Custom.RAG" type="String" reportable="dimension">
-				<ALLOWEDVALUES expanditems="true">
-					<LISTITEM value="Low" />
-					<LISTITEM value="Medium" />
-					<LISTITEM value="High" />
-				</ALLOWEDVALUES>
-			</FIELD>
+Patch body: [{"op":"add","path":"/fields/Custom.RAG","value":"Low"},{"op":"replace","path":"/fields/Custom.RAG","value":"Low"}]
+ERROR updating OKR 305186 : {"$id":"1","innerException":null,"message":"VS403691: Update to work item 305186 had two or more updates for field with reference name 'Custom.RAG'. A field cannot be updated more than once in the same update.","typeName":"System.InvalidOperationException, mscorlib","typeKey":"InvalidOperationException","errorCode":0,"eventId":0}
+Patch URI : http://vwmazbldtfs.fisdev.local:8080/tfs/Prophet/Risk_Mgmt/_apis/wit/workitems/305186?api-version=6.1-preview
+Patch body: [{"op":"add","path":"/fields/Custom.RAG","value":"Low"},{"op":"replace","path":"/fields/Custom.RAG","value":"Low"}]
