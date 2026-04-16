@@ -14,3 +14,11 @@ At C:\agent\_work\_temp\10996c65-9556-4e47-85ef-8c0e752be0f2.ps1:119 char:3
     + CategoryInfo          : InvalidOperation: (System.Net.HttpWebRequest:HttpWebRequest) [Invoke-RestMethod], WebExc 
    eption
     + FullyQualifiedErrorId : WebCmdletWebResponseException,Microsoft.PowerShell.Commands.InvokeRestMethodCommand
+
+			<FIELD name="RAG" refname="Custom.RAG" type="String" reportable="dimension">
+				<ALLOWEDVALUES expanditems="true">
+					<LISTITEM value="Low" />
+					<LISTITEM value="Medium" />
+					<LISTITEM value="High" />
+				</ALLOWEDVALUES>
+			</FIELD>
