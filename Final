@@ -1,13 +1,145 @@
-file /usr/lib/gcc/x86_64-redhat-linux/11/32/libatomic.so
+trigger: none
+pool:
+  name: 'xx'
+steps:
+- task: PowerShell@2
+  displayName: 'Fetch OKRs, count Risks, and update RAG status'
+  inputs:
+    targetType: 'inline'
+    pwsh: false
+    script: |
+      $ErrorActionPreference = "Stop"
 
-[root@vlawsprophbl06 lib]# file /usr/lib/gcc/x86_64-redhat-linux/11/32/libatomic                                                                                                                                                             .so
-/usr/lib/gcc/x86_64-redhat-linux/11/32/libatomic.so: ASCII text
+      # Variables
+      $org     = "org"
+      $project = "project"
+      $token   = "$(System.AccessToken)"
 
-[root@vlaws6 lib]# file /usr/lib/gcc/x86_64-redhat-linux/11/32/libatomic.a
-/usr/lib/gcc/x86_64-redhat-linux/11/32/libatomic.a: broken symbolic link to ../../../i686-redhat-linux/11/libatomic.a
+      if ([string]::IsNullOrWhiteSpace($token)) {
+        Write-Host "System.AccessToken is EMPTY. Enable 'Allow scripts to access the OAuth token'."
+        exit 1
+      }
 
+      $headers = @{
+        Authorization  = "Bearer $token"
+        "Content-Type" = "application/json"
+      }
 
+      # ── RAG thresholds (customize as needed) ──────────────────────────────
+      # 0 linked Risks        → Low
+      # 1–2 linked Risks      → Medium
+      # 3+  linked Risks      → High
+      function Get-RAGStatus($riskCount) {
+        if ($riskCount -ge 3)    { return "High"   }
+        elseif ($riskCount -ge 1) { return "Medium" }
+        else                      { return "Low"    }
+      }
 
-ln -s /usr/lib/gcc/x86_64-redhat-linux/11/32/libatomic.so /usr/lib/libatomic.so
-ln -s /usr/lib/gcc/x86_64-redhat-linux/11/32/libatomic.so /usr/lib/libatomic.so.1
-ln -s /usr/lib/gcc/x86_64-redhat-linux/11/32/libatomic.so /usr/lib/libatomic.so.1.2.0
+      # ── Step 1: Get all OKR IDs via WIQL ─────────────────────────────────
+      $wiqlObj = @{
+        query = @"
+      SELECT [System.Id]
+      FROM WorkItems
+      WHERE [System.WorkItemType] = 'OKR'
+        AND [System.TeamProject] = '$project'
+"@
+      }
+
+      $wiql = $wiqlObj | ConvertTo-Json -Depth 5
+      Write-Host "Querying OKRs..."
+
+      $okrsResponse = Invoke-RestMethod `
+        -Uri "$org/$project/_apis/wit/wiql?api-version=6.1-preview" `
+        -Method POST `
+        -Headers $headers `
+        -Body $wiql
+
+      if (-not $okrsResponse.workItems) {
+        Write-Host "No OKR work items returned by WIQL."
+        exit 0
+      }
+
+      Write-Host "Found $($okrsResponse.workItems.Count) OKR(s)."
+
+      foreach ($okrRef in $okrsResponse.workItems) {
+        $okrId = [int]$okrRef.id
+        Write-Host "----------------------------------------"
+        Write-Host "OKR ID: $okrId"
+
+        # ── Step 2: Fetch OKR details with relations ──────────────────────
+        $base = "$org/$project/_apis/wit/workitems/$okrId"
+        $ub   = [System.UriBuilder]::new($base)
+        $ub.Query = "`$expand=relations&api-version=6.1-preview"
+        $uri  = $ub.Uri.AbsoluteUri
+
+        Write-Host "GET $uri"
+        $okrDetails = Invoke-RestMethod `
+          -Uri $uri `
+          -Method GET `
+          -Headers $headers
+
+        $relations = $okrDetails.relations
+
+        # ── Step 3: Count only linked Risk work items ─────────────────────
+        $riskCount = 0
+
+        if ($relations) {
+          $linkedRelations = $relations | Where-Object {
+            $_.rel -eq "System.LinkTypes.Hierarchy-Forward" -or
+            $_.rel -eq "System.LinkTypes.Related"
+          }
+
+          foreach ($rel in $linkedRelations) {
+            # Extract the linked work item ID from the relation URL
+            $linkedId = $rel.url -replace '.*/(\d+)$', '$1'
+
+            # Fetch the linked work item to check its type
+            $linkedUb = [System.UriBuilder]::new("$org/$project/_apis/wit/workitems/$linkedId")
+            $linkedUb.Query = "api-version=6.1-preview"
+            $linkedUri = $linkedUb.Uri.AbsoluteUri
+
+            $linkedItem = Invoke-RestMethod `
+              -Uri $linkedUri `
+              -Method GET `
+              -Headers $headers
+
+            if ($linkedItem.fields.'System.WorkItemType' -eq "Risk") {
+              $riskCount++
+            }
+          }
+        }
+
+        Write-Host "Linked Risk items: $riskCount"
+
+        # ── Step 4: Derive RAG value ──────────────────────────────────────
+        $ragValue = Get-RAGStatus $riskCount
+        Write-Host "Computed RAG status: $ragValue"
+
+        # ── Step 5: PATCH the RAG field on the OKR ───────────────────────
+        # Replace 'Custom.RAG' below with your field's actual reference name
+        $patchBody = @(
+          @{
+            op    = "add"
+            path  = "/fields/Custom.RAG"
+            value = $ragValue
+          }
+        ) | ConvertTo-Json -Depth 5
+
+        $patchUb = [System.UriBuilder]::new("$org/$project/_apis/wit/workitems/$okrId")
+        $patchUb.Query = "api-version=6.1-preview"
+        $patchUri = $patchUb.Uri.AbsoluteUri
+
+        $patchHeaders = $headers.Clone()
+        $patchHeaders["Content-Type"] = "application/json-patch+json"
+
+        Invoke-RestMethod `
+          -Uri $patchUri `
+          -Method PATCH `
+          -Headers $patchHeaders `
+          -Body $patchBody | Out-Null
+
+        Write-Host "RAG field updated to '$ragValue' on OKR $okrId"
+      }
+
+      Write-Host "========================================"
+      Write-Host "Done. All OKRs processed."
