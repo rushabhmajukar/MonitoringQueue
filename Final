@@ -56,6 +56,30 @@ steps:
 
       Write-Host "Found $($okrsResponse.workItems.Count) OKR(s)."
 
+      # ── Step 1b: Confirm RAG field refname using first OKR ────────────────
+      $firstId  = [int]$okrsResponse.workItems[0].id
+      $checkUb  = [System.UriBuilder]::new("$org/$project/_apis/wit/workitems/$firstId")
+      $checkUb.Query = "api-version=6.1-preview"
+      $checkUri = $checkUb.Uri.AbsoluteUri
+
+      Write-Host "Inspecting fields on OKR $firstId to confirm RAG refname..."
+      $sampleItem = Invoke-RestMethod -Uri $checkUri -Method GET -Headers $headers
+
+      $ragRefName = $null
+      foreach ($key in $sampleItem.fields.PSObject.Properties.Name) {
+        if ($key -like "*RAG*") {
+          $ragRefName = $key
+          Write-Host "Found RAG field refname: $ragRefName"
+          break
+        }
+      }
+
+      if (-not $ragRefName) {
+        Write-Host "WARNING: Could not auto-detect RAG field refname. Falling back to 'Custom.RAG'."
+        $ragRefName = "Custom.RAG"
+      }
+
+      # ── Process each OKR ─────────────────────────────────────────────────
       foreach ($okrRef in $okrsResponse.workItems) {
         $okrId = [int]$okrRef.id
         Write-Host "----------------------------------------"
@@ -109,28 +133,37 @@ steps:
         Write-Host "Computed RAG status: $ragValue"
 
         # ── Step 5: PATCH the RAG field on the OKR ───────────────────────
-        $patchBody = @(
-          @{
-            op    = "add"
-            path  = "/fields/Custom.RAG"
-            value = $ragValue
-          }
-        ) | ConvertTo-Json -Depth 5
+        # Send both 'add' and 'replace' to handle null and already-set fields
+        $patchBody = "[" +
+          "{`"op`":`"add`",`"path`":`"/fields/$ragRefName`",`"value`":`"$ragValue`"}," +
+          "{`"op`":`"replace`",`"path`":`"/fields/$ragRefName`",`"value`":`"$ragValue`"}" +
+          "]"
+
+        Write-Host "Patch body: $patchBody"
 
         $patchUb = [System.UriBuilder]::new("$org/$project/_apis/wit/workitems/$okrId")
         $patchUb.Query = "api-version=6.1-preview"
         $patchUri = $patchUb.Uri.AbsoluteUri
 
-        $patchHeaders = $headers.Clone()
-        $patchHeaders["Content-Type"] = "application/json-patch+json"
+        $patchHeaders = @{
+          Authorization  = "Bearer $token"
+          "Content-Type" = "application/json-patch+json"
+        }
 
-        Invoke-RestMethod `
-          -Uri $patchUri `
-          -Method PATCH `
-          -Headers $patchHeaders `
-          -Body $patchBody | Out-Null
+        try {
+          Invoke-RestMethod `
+            -Uri $patchUri `
+            -Method PATCH `
+            -Headers $patchHeaders `
+            -Body $patchBody | Out-Null
 
-        Write-Host "RAG field updated to '$ragValue' on OKR $okrId"
+          Write-Host "RAG field updated to '$ragValue' on OKR $okrId"
+        }
+        catch {
+          Write-Host "ERROR updating OKR $okrId : $_"
+          Write-Host "Patch URI : $patchUri"
+          Write-Host "Patch body: $patchBody"
+        }
       }
 
       Write-Host "========================================"
